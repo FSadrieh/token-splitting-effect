@@ -84,6 +84,9 @@ class LMDataModule(L.LightningDataModule):
         extension = self.train_file.split(".")[-1]
         if extension in ("txt", "raw"):
             extension = "text"
+        elif extension == "jsonl":
+            extension = "json"
+
 
         data_files = {"train": self.train_file, "val": self.val_file}
 

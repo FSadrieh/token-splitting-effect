@@ -29,10 +29,10 @@ class TrainingArgs:
     language_modeling_objective: Literal["mlm", "clm"] = field(default="mlm")
     "Whether to train a masked language model or a causal language model."
 
-    train_file: str = field(default="train.txt")
+    train_file: str = field(default="train.jsonl")
     "Name of the training file."
 
-    val_file: str = field(default="val.txt")
+    val_file: str = field(default="dev.jsonl")
     "Name of the validation file."
 
     tokenizer_path: str | None = field(default=None)
@@ -68,7 +68,7 @@ class TrainingArgs:
     "The sequence length of samples."
 
     learning_rate: float = field(default=3e-4)
-    batch_size: int = field(default=128, alias="-b")
+    batch_size: int = field(default=16, alias="-b")
     weight_decay: float = 0.1
     beta1: float = 0.9
     beta2: float = 0.95
