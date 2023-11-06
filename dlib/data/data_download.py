@@ -37,10 +37,10 @@ class Args:
     max_train_size: int = field(default=50_000_000)
     "Maximum number of train documents to write to disk. Use to limit very large datasets that you will not exhaust during training anyway. Use -1 to disable."
 
-    dev_size: int = field(default=25_000)
+    dev_size: int = field(default=5_000)
     "If 0, do not construct dev set."
 
-    test_size: int = field(default=25_000)
+    test_size: int = field(default=5_000)
     "If 0, do not contruct test set."
 
     processes: int = field(default=4)
@@ -52,7 +52,7 @@ class Args:
     conserve_disk_space: bool = field(default=False, alias="--disk_space")
     "Disable all HF caching and cleanup download caches to conserve disk space."
 
-    stream: bool = field(default=True)
+    stream: bool = field(default=False)
     "Couple with max_train_size to avoid having to load the entire dataset. Use streaming mode to load dataset and process dataset."
 
     stream_shuffle_buffer_size: int = field(default=100_000)
