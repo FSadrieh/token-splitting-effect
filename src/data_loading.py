@@ -11,7 +11,7 @@ import datasets
 import lightning as L
 from print_on_steroids import logger
 from torch.utils.data.dataloader import DataLoader
-from transformers import DataCollatorForLanguageModeling, PreTrainedTokenizerFast
+from transformers import DataCollatorForLanguageModeling, PreTrainedTokenizerFast, DataCollatorWithPadding
 
 from dlib.frameworks.pytorch import get_rank
 
@@ -64,15 +64,21 @@ class LMDataModule(L.LightningDataModule):
         processed_datasets = datasets.load_from_disk(cache_path)
 
         pad_to_multiple_of = 8 if self.args.precision in ["16-mixed", "bf16-mixed"] else None
-        if self.args.language_modeling_objective == "clm":
+        if self.args.training_objective == "clm":
             data_collator = DataCollatorForLanguageModeling(
                 tokenizer=self.tokenizer, mlm=False, pad_to_multiple_of=pad_to_multiple_of
             )
-        elif self.args.language_modeling_objective == "mlm":
+        elif self.args.training_objective == "mlm":
             DataCollatorClass = DataCollatorForLanguageModeling
             data_collator = DataCollatorClass(
                 tokenizer=self.tokenizer,
                 mlm=True,
+                pad_to_multiple_of=pad_to_multiple_of,
+            )
+        elif self.args.training_objective == "classification":
+            DataCollatorClass = DataCollatorWithPadding
+            data_collator = DataCollatorClass(
+                tokenizer=self.tokenizer,
                 pad_to_multiple_of=pad_to_multiple_of,
             )
 
@@ -130,7 +136,7 @@ class LMDataModule(L.LightningDataModule):
     def process_dataset_in_chunks(self, tokenizer, train_val_datasets):
         """Expects input data to be one document per line. Tokenizes the documents and splits into chunks of max_sequence_legth."""
         tokenized_datasets = train_val_datasets.map(
-            make_tokenize_function(tokenizer, max_seq_length=None, truncate=False),
+            make_tokenize_function(tokenizer, max_seq_length=self.args.block_size, truncate=True),
             batched=True,
             num_proc=1,  # Should use only one process to leverage tokenizers parallelism
             remove_columns=["text"],
@@ -138,16 +144,16 @@ class LMDataModule(L.LightningDataModule):
             desc="Running tokenizer on every text in dataset",
         )
 
-        processed_datasets = tokenized_datasets.map(
-            make_group_text_function(self.args.block_size),
-            batched=True,
-            batch_size=16_000,
-            num_proc=self.args.preprocessing_workers,
-            load_from_cache_file=not self.args.overwrite_data_cache,
-            desc=f"Grouping texts in chunks of {self.args.block_size}",
-        )
+        # processed_datasets = tokenized_datasets.map(
+        #     make_group_text_function(self.args.block_size),
+        #     batched=True,
+        #     batch_size=16_000,
+        #     num_proc=self.args.preprocessing_workers,
+        #     load_from_cache_file=not self.args.overwrite_data_cache,
+        #     desc=f"Grouping texts in chunks of {self.args.block_size}",
+        # )
 
-        return processed_datasets
+        return tokenized_datasets
 
     def train_dataloader(self):
         common_args = dict(
@@ -206,33 +212,30 @@ def make_tokenize_function(tokenizer, max_seq_length=None, truncate=True):
     def tokenize_function(examples):
         return tokenizer(
             examples["text"],
-            padding=False,
+            padding=True,
             truncation=truncate,
             max_length=max_seq_length,
-            # We use return_special_tokens_mask=True because DataCollatorForLanguageModeling is more efficient when it
-            # receives the `special_tokens_mask`.
-            return_special_tokens_mask=True,
         )
 
     return tokenize_function
 
 
-def make_group_text_function(max_seq_length):
-    """Needs to be outside of DataModule because of hashing error in dataset.map"""
+# def make_group_text_function(max_seq_length):
+#     """Needs to be outside of DataModule because of hashing error in dataset.map"""
 
-    def group_texts(examples):
-        # Concatenate all texts.
-        concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
-        total_length = len(concatenated_examples[list(examples.keys())[0]])
-        # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-        # customize this part to your needs.
-        if total_length >= max_seq_length:
-            total_length = (total_length // max_seq_length) * max_seq_length
-        # Split by chunks of max_len.
-        result = {
-            k: [t[i : i + max_seq_length] for i in range(0, total_length, max_seq_length)]
-            for k, t in concatenated_examples.items()
-        }
-        return result
+#     def group_texts(examples):
+#         # Concatenate all texts.
+#         concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
+#         total_length = len(concatenated_examples[list(examples.keys())[0]])
+#         # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
+#         # customize this part to your needs.
+#         if total_length >= max_seq_length:
+#             total_length = (total_length // max_seq_length) * max_seq_length
+#         # Split by chunks of max_len.
+#         result = {
+#             k: [t[i : i + max_seq_length] for i in range(0, total_length, max_seq_length)]
+#             for k, t in concatenated_examples.items()
+#         }
+#         return result
 
-    return group_texts
+#     return group_texts

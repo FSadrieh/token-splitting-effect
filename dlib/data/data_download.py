@@ -106,6 +106,7 @@ def main(args: Args):
             streaming=args.stream,
             num_proc=None if args.stream else args.processes,
         )
+        dataset = dataset.rename_column("sentence", "text")
         print(dataset)
 
 

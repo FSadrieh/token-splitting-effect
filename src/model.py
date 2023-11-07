@@ -6,7 +6,8 @@ from print_on_steroids import logger
 from torch.optim import AdamW
 from transformers.modeling_utils import PreTrainedModel
 from transformers.models.auto.configuration_auto import AutoConfig
-from transformers.models.auto.modeling_auto import AutoModelForCausalLM, AutoModelForMaskedLM
+from transformers.models.auto.modeling_auto import AutoModelForCausalLM, AutoModelForMaskedLM, AutoModelForSequenceClassification
+from transformers.adapters import PrefixTuningConfig
 from transformers.optimization import get_scheduler
 from warmup_scheduler import GradualWarmupScheduler
 
@@ -15,7 +16,7 @@ class BasicLM(L.LightningModule):
     def __init__(
         self,
         model_name_or_path: str,
-        lm_objective: Literal["mlm", "clm"],
+        objective: Literal["mlm", "clm", "classification"],
         from_scratch: bool,
         learning_rate: float,
         weight_decay: float,
@@ -32,18 +33,28 @@ class BasicLM(L.LightningModule):
             self.save_hyperparameters(ignore=["save_hyperparameters"])
         config = AutoConfig.from_pretrained(model_name_or_path, return_dict=True)
 
-        if lm_objective == "mlm":
+        if objective == "mlm":
             self.model: PreTrainedModel = (
                 AutoModelForMaskedLM.from_pretrained(model_name_or_path, config=config)
                 if not from_scratch
                 else AutoModelForMaskedLM.from_config(config=config)
             )
-        elif lm_objective == "clm":
+        elif objective == "clm":
             self.model: PreTrainedModel = (
                 AutoModelForCausalLM.from_pretrained(model_name_or_path, config=config)
                 if not from_scratch
                 else AutoModelForCausalLM.from_config(config=config)
             )
+        elif objective == "classification":
+            self.model: PreTrainedModel = (
+                AutoModelForSequenceClassification.from_pretrained(model_name_or_path, config=config)
+                if not from_scratch
+                else AutoModelForSequenceClassification.from_config(config=config)
+            )
+
+        config = PrefixTuningConfig()
+        self.model.add_adapter("prefix_tuning", config=config)
+        self.model.train_adapter("prefix_tuning")
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
