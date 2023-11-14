@@ -23,7 +23,7 @@ from src.helpers import (
 from src.model import BasicLM
 
 WANDB_PROJECT = "explainable-soft-prompts"
-WANDB_ENTITY = "frederic_sadrieh"
+WANDB_ENTITY = "raphael-team"
 
 
 def main(args: TrainingArgs):
@@ -79,8 +79,8 @@ def main(args: TrainingArgs):
 
     # Resume from checkpoint if specified
     model_args = dict(
-        model_name_or_path=args.hf_model_name,
-        objective=args.training_objective,
+        model_name_or_path_1=args.hf_model_name_1,
+        model_name_or_path_2=args.hf_model_name_2,
         from_scratch=args.from_scratch,
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
@@ -89,23 +89,20 @@ def main(args: TrainingArgs):
         lr_schedule=args.lr_schedule,
         warmup_period=args.warmup_period,
         eval_interval=args.eval_interval,
+        prompt_length=args.prompt_length,
     )
     if args.saved_checkpoint_path:
         args.saved_checkpoint_path = check_for_wandb_checkpoint_and_download_if_necessary(
             args.saved_checkpoint_path, wandb_logger.experiment
         )
 
-        if args.resume:  # load weights, optimizer states, scheduler state, ...\
-            model = BasicLM.load_from_checkpoint(args.saved_checkpoint_path, save_hyperparameters=False)
-            # we will resume via trainer.fit(ckpt_path=...)
-        else:  # load only weights
-            model = BasicLM(**model_args)
-            torch_load = torch.load(args.saved_checkpoint_path, map_location=torch.device("cpu"))
-            model.load_state_dict(torch_load["state_dict"], strict=False)
+        model_args["local_adapter"] = args.saved_checkpoint_path
+        model = BasicLM(**model_args)
+
     else:
         model = BasicLM(**model_args)
 
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(args.tokenizer_path or args.hf_model_name, use_fast=True)
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(args.tokenizer_path or args.hf_model_name_1, use_fast=True)
     if not args.resume:
         pretrained_vocab_size = model.model.get_input_embeddings().weight.shape[0]
         if len(tokenizer) != pretrained_vocab_size:
@@ -125,7 +122,7 @@ def main(args: TrainingArgs):
         model = torch.compile(model)
 
     #################### Construct dataloaders & trainer #################
-    dm = LMDataModule(training_args=args, tokenizer=tokenizer)
+    dm = LMDataModule(training_args=args, tokenizer=tokenizer, prompt_length=args.prompt_length)
     lr_monitor = LearningRateMonitor(logging_interval="step")
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(cleanup_local=True, cleanup_online=False, size_limit=20)
     checkpoint_callback = ModelCheckpoint(
@@ -203,12 +200,13 @@ def main(args: TrainingArgs):
         if current_process_rank == 0:
             logger.info("Trying to save checkpoint....")
 
-            save_path = str(Path(checkpoint_callback.dirpath) / "last_model_ckpt.ckpt")
-            trainer.save_checkpoint(save_path)
+            save_dir = Path(checkpoint_callback.dirpath)
+            os.makedirs(save_dir, exist_ok=True)
+            # TODO: Save state dict
 
             logger.info("Collecting PL checkpoint for wandb...")
             artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")
-            artifact.add_file(save_path, name="model.ckpt")
+            artifact.add_dir(save_dir)
 
             logger.info("Pushing to wandb...")
             aliases = ["train_end", "latest"]

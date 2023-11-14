@@ -107,6 +107,7 @@ def main(args: Args):
             num_proc=None if args.stream else args.processes,
         )
         dataset = dataset.rename_column("sentence", "text")
+        dataset = dataset.remove_columns(["idx"])
         print(dataset)
 
 

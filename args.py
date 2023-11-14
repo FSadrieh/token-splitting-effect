@@ -15,7 +15,10 @@ class TrainingArgs:
 
     data_dir: Path = field(alias="-d")
 
-    hf_model_name: str = field(default="roberta-base", alias="--model")
+    hf_model_name_1: str = field(default="roberta-base", alias="--model_1")
+    "HuggingFace model identifier. This is used to construct the model architecture and load pretrained weights if not specified otherwise."
+
+    hf_model_name_2: str = field(default="roberta-base", alias="--model_2")
     "HuggingFace model identifier. This is used to construct the model architecture and load pretrained weights if not specified otherwise."
 
     from_scratch: bool = field(default=False)
@@ -45,7 +48,7 @@ class TrainingArgs:
     base_unit: Literal["samples", "tokens", "optimizer-steps", "iters"] = field(default="optimizer-steps")
     "Unit of all training constants. They will be converted to optimizer_steps in __post_init__."
 
-    training_goal: int = field(default=100_000)
+    training_goal: int = field(default=200)
     eval_interval: float = field(default=0.1)
     "Interval between evaluations. If < 1, use as percentage of training_goal."
 
@@ -146,6 +149,12 @@ class TrainingArgs:
     fast_dev_run: bool = field(default=False)
     "Do fast run through training and validation with reduced sizes."
 
+    ###############################
+    ###### ESP specific args ######
+    ###############################
+
+    prompt_length: int = field(default=30)
+
     def __post_init__(self):
         assert self.num_devices > 0
         if self.micro_batch_size is None:
@@ -173,8 +182,8 @@ class TrainingArgs:
         assert self.batch_size == self.micro_batch_size * self.num_devices * self.gradient_accumulation_steps
 
         if self.tokenizer_path is None:
-            self.tokenizer_path = self.hf_model_name
-            assert self.hf_model_name is not None
+            self.tokenizer_path = self.hf_model_name_1
+            assert self.hf_model_name_1 is not None
 
         if self.eval_micro_batch_size is None:
             self.eval_micro_batch_size = self.micro_batch_size

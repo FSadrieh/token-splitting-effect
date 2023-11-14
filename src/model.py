@@ -1,13 +1,10 @@
-from typing import Literal
-
 import lightning as L
 import torch
 from print_on_steroids import logger
 from torch.optim import AdamW
 from transformers.modeling_utils import PreTrainedModel
 from transformers.models.auto.configuration_auto import AutoConfig
-from transformers.models.auto.modeling_auto import AutoModelForCausalLM, AutoModelForMaskedLM, AutoModelForSequenceClassification
-from transformers.adapters import PrefixTuningConfig
+from transformers.models.auto.modeling_auto import AutoModelForSequenceClassification
 from transformers.optimization import get_scheduler
 from warmup_scheduler import GradualWarmupScheduler
 
@@ -15,8 +12,7 @@ from warmup_scheduler import GradualWarmupScheduler
 class BasicLM(L.LightningModule):
     def __init__(
         self,
-        model_name_or_path: str,
-        objective: Literal["mlm", "clm", "classification"],
+        model_name_or_path_1: str,
         from_scratch: bool,
         learning_rate: float,
         weight_decay: float,
@@ -25,36 +21,40 @@ class BasicLM(L.LightningModule):
         lr_schedule: str,
         warmup_period: int,
         eval_interval: int,
+        prompt_length: int,
+        model_name_or_path_2: str | None = None,
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
+        local_adapter: str | None = None,
     ) -> None:
         super().__init__()
         if save_hyperparameters:
             self.save_hyperparameters(ignore=["save_hyperparameters"])
-        config = AutoConfig.from_pretrained(model_name_or_path, return_dict=True)
+        config_1 = AutoConfig.from_pretrained(model_name_or_path_1, return_dict=True)
 
-        if objective == "mlm":
-            self.model: PreTrainedModel = (
-                AutoModelForMaskedLM.from_pretrained(model_name_or_path, config=config)
-                if not from_scratch
-                else AutoModelForMaskedLM.from_config(config=config)
-            )
-        elif objective == "clm":
-            self.model: PreTrainedModel = (
-                AutoModelForCausalLM.from_pretrained(model_name_or_path, config=config)
-                if not from_scratch
-                else AutoModelForCausalLM.from_config(config=config)
-            )
-        elif objective == "classification":
-            self.model: PreTrainedModel = (
-                AutoModelForSequenceClassification.from_pretrained(model_name_or_path, config=config)
-                if not from_scratch
-                else AutoModelForSequenceClassification.from_config(config=config)
-            )
+        self.model: PreTrainedModel = (
+            AutoModelForSequenceClassification.from_pretrained(model_name_or_path_1, config=config_1)
+            if not from_scratch
+            else AutoModelForSequenceClassification.from_config(config=config_1)
+        )
 
-        config = PrefixTuningConfig()
-        self.model.add_adapter("prefix_tuning", config=config)
-        self.model.train_adapter("prefix_tuning")
+        if model_name_or_path_2:
+            config_2 = AutoConfig.from_pretrained(model_name_or_path_2, return_dict=True)
+            self.model_2: PreTrainedModel = (
+                AutoModelForSequenceClassification.from_pretrained(model_name_or_path_2, config=config_2)
+                if not from_scratch
+                else AutoModelForSequenceClassification.from_config(config=config_2)
+            )
+        else:
+            self.model_2 = None
+
+        embedding_size = self.model.config.hidden_size
+        self.prompt_embedding = torch.nn.Embedding(prompt_length, embedding_size)
+        self.prompt_tokens = torch.arange(prompt_length).long()
+
+        for param in self.model.parameters():
+            param.requires_grad = False
+
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
@@ -65,16 +65,29 @@ class BasicLM(L.LightningModule):
         self.eval_interval = eval_interval
         self.epsilon = epsilon
 
-    def forward(self, x):
-        return self.model(x).logits
+    def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
+        embedded_input = self.model.get_input_embeddings()(input_ids)
+
+        self.prompt_tokens = self.prompt_tokens.to(embedded_input.device)
+        prompt = self.prompt_embedding(self.prompt_tokens)
+
+        prompt = prompt.unsqueeze(0).expand(embedded_input.shape[0], -1, -1)
+
+        inputs_embeds = torch.cat([prompt, embedded_input], dim=1)
+        attention_mask = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device), attention_mask], dim=1)
+
+        loss = self.model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
+        #loss_2 = self.model_2(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
+        #loss = (loss_1 + loss_2) / 2
+        return loss
 
     def training_step(self, batch, batch_idx):
-        loss = self.model(**batch).loss
+        loss = self(**batch).loss
         self.log("train/loss", loss, on_step=True, on_epoch=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        loss = self.model(**batch).loss
+        loss = self(**batch).loss
         self.log("val/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):

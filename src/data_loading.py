@@ -3,7 +3,6 @@ import glob
 import os
 import shutil
 import tempfile
-from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -24,6 +23,7 @@ class LMDataModule(L.LightningDataModule):
         self,
         training_args: "TrainingArgs",
         tokenizer: PreTrainedTokenizerFast,
+        prompt_length: int,
     ):
         super().__init__()
         self.args = training_args
@@ -37,10 +37,12 @@ class LMDataModule(L.LightningDataModule):
 
         self.train_file = str(train_file)
         self.val_file = str(val_file)
-        self.tokenizer_path = self.args.tokenizer_path or self.args.hf_model_name
+        self.tokenizer_path = self.args.tokenizer_path or self.args.hf_model_name_1
         self.local_rank = get_rank()
 
         self.tokenizer = tokenizer
+        self.tokenize_function = None
+        self.max_length = self.args.block_size - prompt_length
 
     def prepare_data(self) -> None:
         cache_exists, cache_path = self._get_dataset_cache_path(self.tokenizer_path)
@@ -63,24 +65,11 @@ class LMDataModule(L.LightningDataModule):
         logger.info(f"Loading cached processed dataset from {cache_path}...", rank0_only=False)
         processed_datasets = datasets.load_from_disk(cache_path)
 
-        pad_to_multiple_of = 8 if self.args.precision in ["16-mixed", "bf16-mixed"] else None
-        if self.args.training_objective == "clm":
-            data_collator = DataCollatorForLanguageModeling(
-                tokenizer=self.tokenizer, mlm=False, pad_to_multiple_of=pad_to_multiple_of
-            )
-        elif self.args.training_objective == "mlm":
-            DataCollatorClass = DataCollatorForLanguageModeling
-            data_collator = DataCollatorClass(
-                tokenizer=self.tokenizer,
-                mlm=True,
-                pad_to_multiple_of=pad_to_multiple_of,
-            )
-        elif self.args.training_objective == "classification":
-            DataCollatorClass = DataCollatorWithPadding
-            data_collator = DataCollatorClass(
-                tokenizer=self.tokenizer,
-                pad_to_multiple_of=pad_to_multiple_of,
-            )
+        DataCollatorClass = DataCollatorWithPadding
+        data_collator = DataCollatorClass(
+            tokenizer=self.tokenizer,
+            max_length=self.max_length,
+        )
 
         self.train_dataset = processed_datasets["train"]
         self.val_dataset = processed_datasets["val"]
@@ -136,22 +125,13 @@ class LMDataModule(L.LightningDataModule):
     def process_dataset_in_chunks(self, tokenizer, train_val_datasets):
         """Expects input data to be one document per line. Tokenizes the documents and splits into chunks of max_sequence_legth."""
         tokenized_datasets = train_val_datasets.map(
-            make_tokenize_function(tokenizer, max_seq_length=self.args.block_size, truncate=True),
+            make_tokenize_function(tokenizer, truncate=True, max_seq_length=self.max_length),
             batched=True,
             num_proc=1,  # Should use only one process to leverage tokenizers parallelism
             remove_columns=["text"],
             load_from_cache_file=not self.args.overwrite_data_cache,
             desc="Running tokenizer on every text in dataset",
         )
-
-        # processed_datasets = tokenized_datasets.map(
-        #     make_group_text_function(self.args.block_size),
-        #     batched=True,
-        #     batch_size=16_000,
-        #     num_proc=self.args.preprocessing_workers,
-        #     load_from_cache_file=not self.args.overwrite_data_cache,
-        #     desc=f"Grouping texts in chunks of {self.args.block_size}",
-        # )
 
         return tokenized_datasets
 
@@ -180,16 +160,17 @@ class LMDataModule(L.LightningDataModule):
 
     def _get_dataset_cache_path(self, tokenizer_name: str):
         tokenizer_name = Path(self.tokenizer_path).as_posix().replace("/", "_")
-        tokenize_fn = make_tokenize_function(self.tokenizer, self.args.block_size)
-        tokenize_fn_hash = datasets.fingerprint.Hasher.hash(tokenize_fn)
+        # This is to prevent a rarely occurring bug where the hash of the tokenize function changes between runs
+        self.tokenize_function = self.tokenize_function if self.tokenize_function else make_tokenize_function(self.tokenizer, truncate = True, max_seq_length=self.max_length)
+        tokenize_fn_hash = datasets.fingerprint.Hasher.hash(self.tokenize_function)
         tokenized_data_dir = str(self.data_dir / "tokenized")
         cache_path = os.path.join(
             tokenized_data_dir,
-            f"{self.args.train_file}.{self.args.val_file}.seq_len_{self.args.block_size}.tokenizer_{tokenizer_name}.tokenize_fn_hash_{tokenize_fn_hash}.arrow",
+            f"{self.args.train_file}.{self.args.val_file}.seq_len_{self.max_length}.tokenizer_{tokenizer_name}.tokenize_fn_hash_{tokenize_fn_hash}.arrow",
         )
         maybe_cache_path = os.path.join(
             tokenized_data_dir,
-            f"{self.args.train_file}.{self.args.val_file}.seq_len_{self.args.block_size}.tokenizer_{tokenizer_name}.tokenize_fn_hash_.*.arrow",
+            f"{self.args.train_file}.{self.args.val_file}.seq_len_{self.max_length}.tokenizer_{tokenizer_name}.tokenize_fn_hash_.*.arrow",
         )
         maybe_cache_path_match_list = glob.glob(maybe_cache_path)
 
@@ -206,36 +187,15 @@ class LMDataModule(L.LightningDataModule):
             return False, cache_path
 
 
-def make_tokenize_function(tokenizer, max_seq_length=None, truncate=True):
+def make_tokenize_function(tokenizer, truncate, max_seq_length):
     """Needs to be outside of DataModule because of hashing error in dataset.map"""
 
     def tokenize_function(examples):
         return tokenizer(
             examples["text"],
+            max_length=max_seq_length,
             padding=True,
             truncation=truncate,
-            max_length=max_seq_length,
         )
 
     return tokenize_function
-
-
-# def make_group_text_function(max_seq_length):
-#     """Needs to be outside of DataModule because of hashing error in dataset.map"""
-
-#     def group_texts(examples):
-#         # Concatenate all texts.
-#         concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
-#         total_length = len(concatenated_examples[list(examples.keys())[0]])
-#         # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-#         # customize this part to your needs.
-#         if total_length >= max_seq_length:
-#             total_length = (total_length // max_seq_length) * max_seq_length
-#         # Split by chunks of max_len.
-#         result = {
-#             k: [t[i : i + max_seq_length] for i in range(0, total_length, max_seq_length)]
-#             for k, t in concatenated_examples.items()
-#         }
-#         return result
-
-#     return group_texts
