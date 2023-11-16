@@ -76,7 +76,7 @@ class BasicLM(L.LightningModule):
         prompt = prompt.unsqueeze(0).expand(embedded_input.shape[0], -1, -1)
 
         inputs_embeds = torch.cat([prompt, embedded_input], dim=1)
-        attention_mask = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device), attention_mask], dim=1)
+        attention_mask = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.attention_mask), attention_mask], dim=1)
 
         loss = self.model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
         #loss_2 = self.model_2(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
