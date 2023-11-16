@@ -27,7 +27,8 @@ WANDB_ENTITY = "raphael-team"
 
 
 def main(args: TrainingArgs):
-    ########### CUDA checks ###########
+    # Checking CUDA device availability and setup
+    # "Rank" is the ID of the process in a distributed SLURM evironment, Rank 0 is main process
     current_process_rank = get_rank()
     logger.config(rank=current_process_rank, print_rank0_only=True)
     if args.accelerator == "cuda":
@@ -42,15 +43,21 @@ def main(args: TrainingArgs):
             exit(1)
     if current_process_rank == 0 and args.debug:
         wait_for_debugger()
+    # Setting a seed for reproducibility
     args.seed = seed_everything(workers=True, seed=args.seed)
 
-    ############# Construct W&B Logger ##############
+    # Setting up Weights & Biases (W&B) logging and configuration
+    # Handling offline mode, fast development run, and data preprocessing
     if args.offline or args.fast_dev_run or args.data_preprocessing_only:
         os.environ["WANDB_MODE"] = "dryrun"
     wandb_extra_args = dict(name=args.run_name)
+    
+    # Resume training from W&B checkpoint if necessary
     if args.saved_checkpoint_path and args.resume and check_checkpoint_path_for_wandb(args.saved_checkpoint_path):
         logger.info("Resuming training from W&B")
-        wandb_extra_args = dict(id=check_checkpoint_path_for_wandb(args.saved_checkpoint_path), resume="must")  # resume W&B run
+        wandb_extra_args = dict(id=check_checkpoint_path_for_wandb(args.saved_checkpoint_path), resume="must") # resume W&B run
+    
+    # Initializing the W&B logger with project and entity details
     wandb_logger = WandbLogger(
         project=WANDB_PROJECT,
         entity=WANDB_ENTITY,
@@ -61,8 +68,10 @@ def main(args: TrainingArgs):
     )
     wandb_logger.log_hyperparams(dataclasses.asdict(args))
     wandb_logger.experiment.log_code(".")  # log code to wandb to be able to reproduce the run
+    # Logging arguments if the current process is the primary one
     if current_process_rank == 0:
         logger.info(args)
+    # Handling run names and appending IDs for W&B UI recognition
     if current_process_rank == 0 and not args.resume and not args.offline:
         if args.run_name is None:
             logger.warning("No run name specified with `--run_name`. Using W&B default (randomly generated name).")
@@ -71,6 +80,7 @@ def main(args: TrainingArgs):
             wandb_logger.experiment.name = (
                 args.run_name + "-" + wandb_logger.version
             )  # Append id to name for easier recognition in W&B UI
+    # SLURM: cluster management and job scheduling system
     IS_ON_SLURM = SLURMEnvironment.detect()
     if IS_ON_SLURM and current_process_rank == 0:
         log_slurm_info()
@@ -102,6 +112,7 @@ def main(args: TrainingArgs):
     else:
         model = BasicLM(**model_args)
 
+    # Initializing tokenizer and resizing embeddings if necessary
     tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(args.tokenizer_path or args.hf_model_name_1, use_fast=True)
     if not args.resume:
         pretrained_vocab_size = model.model.get_input_embeddings().weight.shape[0]
@@ -122,7 +133,10 @@ def main(args: TrainingArgs):
         model = torch.compile(model)
 
     #################### Construct dataloaders & trainer #################
+    # Constructing data loaders and configuring the trainer
+    # Initializing the data module for loading and preprocessing data
     dm = LMDataModule(training_args=args, tokenizer=tokenizer, prompt_length=args.prompt_length)
+    # Setting up callbacks for learning rate monitoring, checkpointing, and metrics
     lr_monitor = LearningRateMonitor(logging_interval="step")
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(cleanup_local=True, cleanup_online=False, size_limit=20)
     checkpoint_callback = ModelCheckpoint(
@@ -144,7 +158,7 @@ def main(args: TrainingArgs):
     # lightning wants val_check_interval in num forward passes (iters) not num optimization steps
     val_frequency_in_iters = args.eval_interval * args.gradient_accumulation_steps
 
-    # Initialize trainer
+    # Initialize PyTorch Lightning trainer
     trainer = Trainer(
         max_steps=args.training_goal,
         val_check_interval=val_frequency_in_iters,
@@ -202,7 +216,9 @@ def main(args: TrainingArgs):
 
             save_dir = Path(checkpoint_callback.dirpath)
             os.makedirs(save_dir, exist_ok=True)
-            # TODO: Save state dict
+            # TODO: Add functionality to save the model's state dictionary (state_dict).
+            # This allows for greater flexibility in loading the model's parameters into different architectures
+            # or frameworks.
 
             logger.info("Collecting PL checkpoint for wandb...")
             artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")

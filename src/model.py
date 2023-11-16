@@ -9,6 +9,7 @@ from transformers.optimization import get_scheduler
 from warmup_scheduler import GradualWarmupScheduler
 
 
+# Define a basic Language Model using PyTorch Lightning
 class BasicLM(L.LightningModule):
     def __init__(
         self,
@@ -27,17 +28,20 @@ class BasicLM(L.LightningModule):
         save_hyperparameters: bool = True,
         local_adapter: str | None = None,
     ) -> None:
+        # Initialize the LightningModule
         super().__init__()
         if save_hyperparameters:
             self.save_hyperparameters(ignore=["save_hyperparameters"])
+        
+        # Load configuration and initialize the first transformer model
         config_1 = AutoConfig.from_pretrained(model_name_or_path_1, return_dict=True)
-
         self.model: PreTrainedModel = (
             AutoModelForSequenceClassification.from_pretrained(model_name_or_path_1, config=config_1)
             if not from_scratch
             else AutoModelForSequenceClassification.from_config(config=config_1)
         )
 
+        # Optionally load a second transformer model, if provided
         if model_name_or_path_2:
             config_2 = AutoConfig.from_pretrained(model_name_or_path_2, return_dict=True)
             self.model_2: PreTrainedModel = (
@@ -48,14 +52,16 @@ class BasicLM(L.LightningModule):
         else:
             self.model_2 = None
 
+        # Initialize a prompt embedding layer
         embedding_size = self.model.config.hidden_size
         self.prompt_embedding = torch.nn.Embedding(prompt_length, embedding_size)
         self.prompt_tokens = torch.arange(prompt_length).long()
 
+        # Freeze parameters of the model(s) for prompt-based tuning
         for param in self.model.parameters():
             param.requires_grad = False
 
-
+        # Store optimization parameters
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.beta1 = beta1
@@ -66,14 +72,16 @@ class BasicLM(L.LightningModule):
         self.epsilon = epsilon
 
     def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
+        # Forward pass through the model
         embedded_input = self.model.get_input_embeddings()(input_ids)
 
+        # Generate prompt embeddings and concatenate with input embeddings
         self.prompt_tokens = self.prompt_tokens.to(embedded_input.device)
         prompt = self.prompt_embedding(self.prompt_tokens)
-
         prompt = prompt.unsqueeze(0).expand(embedded_input.shape[0], -1, -1)
-
         inputs_embeds = torch.cat([prompt, embedded_input], dim=1)
+        
+        # Adjust attention mask for the concatenated prompt
         attention_mask = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device), attention_mask], dim=1)
 
         loss = self.model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
@@ -82,15 +90,18 @@ class BasicLM(L.LightningModule):
         return loss
 
     def training_step(self, batch, batch_idx):
+        # Perform a training step
         loss = self(**batch).loss
         self.log("train/loss", loss, on_step=True, on_epoch=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
+        # Perform a validation step
         loss = self(**batch).loss
         self.log("val/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):
+        # Configure the optimizers and learning rate schedulers
         if self.global_rank == 0:
             logger.info(
                 f"Using lr: {self.learning_rate}, weight decay: {self.weight_decay} and warmup steps: {self.warmup_period}"
@@ -98,10 +109,11 @@ class BasicLM(L.LightningModule):
 
         named_parameters = list(self.model.named_parameters())
 
-        ### Filter out parameters that are not optimized (requires_grad == False)
+        # Filter out parameters that are not optimized (requires_grad == False)
         optimized_named_parameters = [(n, p) for n, p in named_parameters if p.requires_grad]
 
-        ### Do not include LayerNorm and bias terms for weight decay https://forums.fast.ai/t/is-weight-decay-applied-to-the-bias-term/73212/6
+        # Set different weight decay for certain parameters
+        # Do not include LayerNorm and bias terms for weight decay https://forums.fast.ai/t/is-weight-decay-applied-to-the-bias-term/73212/6
         no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
         optimizer_parameters = [
             {
@@ -120,6 +132,7 @@ class BasicLM(L.LightningModule):
             eps=self.epsilon,  # You can also tune this
         )
 
+        # Configure learning rate scheduler based on the selected strategy
         if self.lr_schedule == "reduce_on_plateau":
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, verbose=True)
             if self.warmup_period > 0:  # Wrap ReduceLROnPlateau to enable LR warmup
