@@ -149,11 +149,12 @@ class TrainingArgs:
     fast_dev_run: bool = field(default=False)
     "Do fast run through training and validation with reduced sizes."
 
-    ###############################
-    ###### ESP specific args ######
-    ###############################
+    ####################################################
+    ###### Explainable Soft Prompts specific args ######
+    ####################################################
 
     prompt_length: int = field(default=30)
+    "Length of soft prompt to be trained."
 
     def __post_init__(self):
         assert self.num_devices > 0

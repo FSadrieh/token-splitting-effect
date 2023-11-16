@@ -5,6 +5,14 @@
 ![Linter](https://img.shields.io/badge/linter-ruff-blue)
 ![License: MIT](https://img.shields.io/github/license/konstantinjdobler/nlp-research-template?color=green)
 
+## Explainable Soft Prompts
+
+```bash
+# Example 
+python train.py --data_dir data/imdb --micro_batch_size 16 --hf_model_name google/multiberts-seed_3 --offline --preprocessing_workers 1
+```
+
+
 NLP research template for training language models using PyTorch + Lightning + Weights & Biases + HuggingFace. It's built to be customized but provides comprehensive, sensible default functionality.
 
 If you are not doing NLP or want to use your own training code or template, the setup and environment tooling with Docker, `mamba`, and `conda-lock` in this template might still be interesting for you.
