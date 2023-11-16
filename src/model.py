@@ -50,6 +50,8 @@ class BasicLM(L.LightningModule):
 
         embedding_size = self.model.config.hidden_size
         self.prompt_embedding = torch.nn.Embedding(prompt_length, embedding_size)
+        # Random initialization of embedding
+        torch.nn.init.normal_(self.prompt_embedding.weight, mean=0.0, std=0.02)  
         self.prompt_tokens = torch.arange(prompt_length).long()
 
         for param in self.model.parameters():
