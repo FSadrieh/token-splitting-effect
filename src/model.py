@@ -49,19 +49,24 @@ class BasicLM(L.LightningModule):
                 if not from_scratch
                 else AutoModelForSequenceClassification.from_config(config=config_2)
             )
+            for param in self.model_2.parameters():
+                param.requires_grad = False
         else:
             self.model_2 = None
-
-        # Initialize a prompt embedding layer
-        embedding_size = self.model.config.hidden_size
-        self.prompt_embedding = torch.nn.Embedding(prompt_length, embedding_size)
-        self.prompt_tokens = torch.arange(prompt_length).long()
 
         # Freeze parameters of the model(s) for prompt-based tuning
         for param in self.model.parameters():
             param.requires_grad = False
 
+        # Initialize a prompt embedding layer
+        embedding_size = self.model.config.hidden_size
+        self.soft_prompt = torch.nn.Embedding(prompt_length, embedding_size)
+        self.prompt_tokens = torch.arange(prompt_length).long()
+
         # Store optimization parameters
+        prompt_token_weights = self.model.get_input_embeddings()(self.prompt_tokens).detach().clone()
+        self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
+
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.beta1 = beta1
@@ -71,14 +76,13 @@ class BasicLM(L.LightningModule):
         self.eval_interval = eval_interval
         self.epsilon = epsilon
 
+
     def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
         # Forward pass through the model
         embedded_input = self.model.get_input_embeddings()(input_ids)
+        prompt = self.soft_prompt(self.prompt_tokens.to(self.device)).unsqueeze(0).expand(embedded_input.shape[0], -1, -1)
 
         # Generate prompt embeddings and concatenate with input embeddings
-        self.prompt_tokens = self.prompt_tokens.to(embedded_input.device)
-        prompt = self.prompt_embedding(self.prompt_tokens)
-        prompt = prompt.unsqueeze(0).expand(embedded_input.shape[0], -1, -1)
         inputs_embeds = torch.cat([prompt, embedded_input], dim=1)
         
         # Adjust attention mask for the concatenated prompt
@@ -91,13 +95,13 @@ class BasicLM(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         # Perform a training step
-        loss = self(**batch).loss
-        self.log("train/loss", loss, on_step=True, on_epoch=False)
+        loss = self(**batch)
+        self.log("train/loss", loss, on_step=True, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         # Perform a validation step
-        loss = self(**batch).loss
+        loss = self(**batch)
         self.log("val/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):

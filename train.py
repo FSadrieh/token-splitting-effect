@@ -160,7 +160,7 @@ def main(args: TrainingArgs):
 
     # Initialize PyTorch Lightning trainer
     trainer = Trainer(
-        max_steps=args.training_goal,
+        max_epochs=args.training_goal,
         val_check_interval=val_frequency_in_iters,
         check_val_every_n_epoch=None,  # validation based on steps instead of epochs
         devices=args.num_devices,
@@ -219,6 +219,7 @@ def main(args: TrainingArgs):
             # TODO: Add functionality to save the model's state dictionary (state_dict).
             # This allows for greater flexibility in loading the model's parameters into different architectures
             # or frameworks.
+            torch.save(model.soft_prompt.state_dict(), save_dir / "soft_prompt.pt")
 
             logger.info("Collecting PL checkpoint for wandb...")
             artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")

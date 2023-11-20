@@ -15,10 +15,10 @@ class TrainingArgs:
 
     data_dir: Path = field(alias="-d")
 
-    hf_model_name_1: str = field(default="roberta-base", alias="--model_1")
+    hf_model_name_1: str = field(default="google/multiberts-seed_1", alias="--model_1")
     "HuggingFace model identifier. This is used to construct the model architecture and load pretrained weights if not specified otherwise."
 
-    hf_model_name_2: str = field(default="roberta-base", alias="--model_2")
+    hf_model_name_2: str = field(default=None, alias="--model_2")
     "HuggingFace model identifier. This is used to construct the model architecture and load pretrained weights if not specified otherwise."
 
     from_scratch: bool = field(default=False)
@@ -45,10 +45,8 @@ class TrainingArgs:
     ##### Training constants ######
     ###############################
 
-    base_unit: Literal["samples", "tokens", "optimizer-steps", "iters"] = field(default="optimizer-steps")
-    "Unit of all training constants. They will be converted to optimizer_steps in __post_init__."
-
-    training_goal: int = field(default=200)
+    training_goal: int = field(default=1_000)
+    "Number of epochs to run."
     eval_interval: float = field(default=0.1)
     "Interval between evaluations. If < 1, use as percentage of training_goal."
 
@@ -189,24 +187,10 @@ class TrainingArgs:
         if self.eval_micro_batch_size is None:
             self.eval_micro_batch_size = self.micro_batch_size
 
-        # Calculate training constants
-        if self.base_unit == "samples":
-            UNITS_PER_STEP = self.batch_size
-        elif self.base_unit == "tokens":
-            assert self.block_size is not None, "block_size must be set if base_unit is tokens"
-            UNITS_PER_STEP = self.batch_size * self.block_size
-        elif self.base_unit == "optimizer-steps":
-            UNITS_PER_STEP = 1
-        elif self.base_unit == "iters":
-            UNITS_PER_STEP = self.gradient_accumulation_steps
-        else:
-            raise ValueError(f"Unknown training goal unit: {self.base_unit}")
-
-        self.training_goal = int(self.training_goal / UNITS_PER_STEP)
-        self.eval_interval = int(self.eval_interval / UNITS_PER_STEP)
-        self.save_interval = int(self.save_interval / UNITS_PER_STEP)
-        self.warmup_period = int(self.warmup_period / UNITS_PER_STEP)
-        self.lr_decay_period = int(self.lr_decay_period / UNITS_PER_STEP)
+        self.eval_interval = int(self.eval_interval / self.batch_size)
+        self.save_interval = int(self.save_interval / self.batch_size)
+        self.warmup_period = int(self.warmup_period / self.batch_size)
+        self.lr_decay_period = int(self.lr_decay_period / self.batch_size)
 
         if self.preprocessing_workers == -1:
             # Set to all available CPUs, handle SLURM case when only some CPUs are available to the job
