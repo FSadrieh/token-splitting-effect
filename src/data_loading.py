@@ -10,7 +10,7 @@ import datasets
 import lightning as L
 from print_on_steroids import logger
 from torch.utils.data.dataloader import DataLoader
-from transformers import DataCollatorForLanguageModeling, PreTrainedTokenizerFast, DataCollatorWithPadding
+from transformers import PreTrainedTokenizerFast, DefaultDataCollator
 
 from dlib.frameworks.pytorch import get_rank
 
@@ -73,11 +73,7 @@ class LMDataModule(L.LightningDataModule):
         processed_datasets = datasets.load_from_disk(cache_path)
 
         # Initialize data collator for batching and padding
-        DataCollatorClass = DataCollatorWithPadding
-        data_collator = DataCollatorClass(
-            tokenizer=self.tokenizer,
-            max_length=self.max_length,
-        )
+        data_collator = DefaultDataCollator()
 
         # Assign datasets and data collator for training and validation
         self.train_dataset = processed_datasets["train"]
