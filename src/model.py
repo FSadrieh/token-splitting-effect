@@ -26,7 +26,7 @@ class BasicLM(L.LightningModule):
         model_name_or_path_2: str | None = None,
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
-        local_adapter: str | None = None,
+        local_soft_prompt: str | None = None,
     ) -> None:
         # Initialize the LightningModule
         super().__init__()
@@ -64,8 +64,11 @@ class BasicLM(L.LightningModule):
         self.prompt_tokens = torch.arange(prompt_length).long()
 
         # Store optimization parameters
-        prompt_token_weights = self.model.get_input_embeddings()(self.prompt_tokens).detach().clone()
-        self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
+        if local_soft_prompt:
+            self.soft_prompt.load_state_dict(torch.load(local_soft_prompt))
+        else:
+            prompt_token_weights = self.model.get_input_embeddings()(self.prompt_tokens).detach().clone()
+            self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay

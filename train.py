@@ -106,7 +106,7 @@ def main(args: TrainingArgs):
             args.saved_checkpoint_path, wandb_logger.experiment
         )
 
-        model_args["local_adapter"] = args.saved_checkpoint_path
+        model_args["local_soft_prompt"] = args.saved_checkpoint_path
         model = BasicLM(**model_args)
 
     else:
