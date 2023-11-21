@@ -1,7 +1,9 @@
 import lightning as L
 import torch
+import math
 from print_on_steroids import logger
 from torch.optim import AdamW
+from transformers import PreTrainedTokenizerFast
 from transformers.modeling_utils import PreTrainedModel
 from transformers.models.auto.configuration_auto import AutoConfig
 from transformers.models.auto.modeling_auto import AutoModelForSequenceClassification
@@ -14,6 +16,7 @@ class BasicLM(L.LightningModule):
     def __init__(
         self,
         model_name_or_path_1: str,
+        tokenizer: PreTrainedTokenizerFast,
         from_scratch: bool,
         learning_rate: float,
         weight_decay: float,
@@ -27,6 +30,7 @@ class BasicLM(L.LightningModule):
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
         local_soft_prompt: str | None = None,
+        init_text: str | None = None,
     ) -> None:
         # Initialize the LightningModule
         super().__init__()
@@ -55,20 +59,29 @@ class BasicLM(L.LightningModule):
             self.model_2 = None
 
         # Freeze parameters of the model(s) for prompt-based tuning
-        for param in self.model.parameters():
-            param.requires_grad = False
+        for name, param in self.model.named_parameters():
+            if "classifier" not in name:
+                param.requires_grad = False
 
         # Initialize a prompt embedding layer
+        # This snippet is inspired by https://github.com/huggingface/peft/blob/main/src/peft/tuners/prompt_tuning/model.py
         embedding_size = self.model.config.hidden_size
         self.soft_prompt = torch.nn.Embedding(prompt_length, embedding_size)
         self.prompt_tokens = torch.arange(prompt_length).long()
 
-        # Store optimization parameters
         if local_soft_prompt:
             self.soft_prompt.load_state_dict(torch.load(local_soft_prompt))
         else:
-            prompt_token_weights = self.model.get_input_embeddings()(self.prompt_tokens).detach().clone()
-            self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
+            if init_text:
+                init_ids = tokenizer(init_text)["input_ids"]
+                if len(init_ids) > prompt_length:
+                    init_ids = init_ids[:prompt_length]
+                elif len(init_ids) < prompt_length:
+                    num_reps = math.ceil(prompt_length / len(init_ids))
+                    init_ids = init_ids * num_reps
+                init_ids = init_ids[:prompt_length]
+                prompt_token_weights = self.model.get_input_embeddings()(torch.LongTensor(init_ids)).detach().clone()
+                self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
@@ -114,7 +127,7 @@ class BasicLM(L.LightningModule):
                 f"Using lr: {self.learning_rate}, weight decay: {self.weight_decay} and warmup steps: {self.warmup_period}"
             )
 
-        named_parameters = list(self.model.named_parameters())
+        named_parameters = list(self.model.named_parameters()) + list(self.soft_prompt.named_parameters())
 
         # Filter out parameters that are not optimized (requires_grad == False)
         optimized_named_parameters = [(n, p) for n, p in named_parameters if p.requires_grad]

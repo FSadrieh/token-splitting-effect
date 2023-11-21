@@ -87,10 +87,12 @@ def main(args: TrainingArgs):
 
     ################# Construct model ##############
 
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(args.tokenizer_path or args.hf_model_name_1, use_fast=True)
     # Resume from checkpoint if specified
     model_args = dict(
         model_name_or_path_1=args.hf_model_name_1,
         model_name_or_path_2=args.hf_model_name_2,
+        tokenizer=tokenizer,
         from_scratch=args.from_scratch,
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
@@ -100,6 +102,7 @@ def main(args: TrainingArgs):
         warmup_period=args.warmup_period,
         eval_interval=args.eval_interval,
         prompt_length=args.prompt_length,
+        init_text=args.init_text,
     )
     if args.saved_checkpoint_path:
         args.saved_checkpoint_path = check_for_wandb_checkpoint_and_download_if_necessary(
@@ -113,7 +116,6 @@ def main(args: TrainingArgs):
         model = BasicLM(**model_args)
 
     # Initializing tokenizer and resizing embeddings if necessary
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(args.tokenizer_path or args.hf_model_name_1, use_fast=True)
     if not args.resume:
         pretrained_vocab_size = model.model.get_input_embeddings().weight.shape[0]
         if len(tokenizer) != pretrained_vocab_size:
@@ -160,7 +162,7 @@ def main(args: TrainingArgs):
 
     # Initialize PyTorch Lightning trainer
     trainer = Trainer(
-        max_epochs=args.training_goal,
+        max_steps=args.training_goal,
         val_check_interval=val_frequency_in_iters,
         check_val_every_n_epoch=None,  # validation based on steps instead of epochs
         devices=args.num_devices,

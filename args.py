@@ -46,7 +46,7 @@ class TrainingArgs:
     ###############################
 
     training_goal: int = field(default=1_000)
-    "Number of epochs to run."
+    "Number of steps to run."
     eval_interval: float = field(default=0.1)
     "Interval between evaluations. If < 1, use as percentage of training_goal."
 
@@ -154,6 +154,9 @@ class TrainingArgs:
     prompt_length: int = field(default=30)
     "Length of soft prompt to be trained."
 
+    init_text: str = field(default=None)
+    "Initial text to be used for soft prompt initialization."
+
     def __post_init__(self):
         assert self.num_devices > 0
         if self.micro_batch_size is None:
@@ -186,11 +189,6 @@ class TrainingArgs:
 
         if self.eval_micro_batch_size is None:
             self.eval_micro_batch_size = self.micro_batch_size
-
-        self.eval_interval = int(self.eval_interval / self.batch_size)
-        self.save_interval = int(self.save_interval / self.batch_size)
-        self.warmup_period = int(self.warmup_period / self.batch_size)
-        self.lr_decay_period = int(self.lr_decay_period / self.batch_size)
 
         if self.preprocessing_workers == -1:
             # Set to all available CPUs, handle SLURM case when only some CPUs are available to the job
