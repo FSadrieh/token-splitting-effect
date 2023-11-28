@@ -6,7 +6,7 @@ from torch.optim import AdamW
 from transformers import PreTrainedTokenizerFast
 from transformers.modeling_utils import PreTrainedModel
 from transformers.models.auto.configuration_auto import AutoConfig
-from transformers.models.auto.modeling_auto import AutoModelForSequenceClassification
+from transformers.models.auto.modeling_auto import AutoModelForMaskedLM
 from transformers.optimization import get_scheduler
 from warmup_scheduler import GradualWarmupScheduler
 
@@ -40,18 +40,18 @@ class BasicLM(L.LightningModule):
         # Load configuration and initialize the first transformer model
         config_1 = AutoConfig.from_pretrained(model_name_or_path_1, return_dict=True)
         self.model: PreTrainedModel = (
-            AutoModelForSequenceClassification.from_pretrained(model_name_or_path_1, config=config_1)
+            AutoModelForMaskedLM.from_pretrained(model_name_or_path_1, config=config_1)
             if not from_scratch
-            else AutoModelForSequenceClassification.from_config(config=config_1)
+            else AutoModelForMaskedLM.from_config(config=config_1)
         )
 
         # Optionally load a second transformer model, if provided
         if model_name_or_path_2:
             config_2 = AutoConfig.from_pretrained(model_name_or_path_2, return_dict=True)
             self.model_2: PreTrainedModel = (
-                AutoModelForSequenceClassification.from_pretrained(model_name_or_path_2, config=config_2)
+                AutoModelForMaskedLM.from_pretrained(model_name_or_path_2, config=config_2)
                 if not from_scratch
-                else AutoModelForSequenceClassification.from_config(config=config_2)
+                else AutoModelForMaskedLM.from_config(config=config_2)
             )
             for param in self.model_2.parameters():
                 param.requires_grad = False
@@ -59,9 +59,8 @@ class BasicLM(L.LightningModule):
             self.model_2 = None
 
         # Freeze parameters of the model(s) for prompt-based tuning
-        for name, param in self.model.named_parameters():
-            if "classifier" not in name:
-                param.requires_grad = False
+        for param in self.model.parameters():
+            param.requires_grad = False
 
         # Initialize a prompt embedding layer
         # This snippet is inspired by https://github.com/huggingface/peft/blob/main/src/peft/tuners/prompt_tuning/model.py
@@ -91,9 +90,11 @@ class BasicLM(L.LightningModule):
         self.warmup_period = warmup_period
         self.eval_interval = eval_interval
         self.epsilon = epsilon
+        self.tokenizer = tokenizer
 
 
     def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
+        input_ids[:, -1] = self.tokenizer.mask_token_id
         # Forward pass through the model
         embedded_input = self.model.get_input_embeddings()(input_ids)
         prompt = self.soft_prompt(self.prompt_tokens.to(self.device)).unsqueeze(0).expand(embedded_input.shape[0], -1, -1)
@@ -104,9 +105,20 @@ class BasicLM(L.LightningModule):
         # Adjust attention mask for the concatenated prompt
         attention_mask = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device), attention_mask], dim=1)
 
-        loss = self.model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
+        logits = self.model(inputs_embeds=inputs_embeds, attention_mask=attention_mask).logits
         #loss_2 = self.model_2(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
         #loss = (loss_1 + loss_2) / 2
+
+        # Calculate loss the token_id for negative is 4997 and for positive 3893
+        labels[labels==0] = 4997
+        labels[labels==1] = 3893
+        loss = torch.nn.CrossEntropyLoss()(logits[:, -1], labels)
+
+        # Loss alternative: penalize the model for predicting the wrong token without looking at the percentages
+        # predicted_token_ids = logits[:, -1].argmax(axis=-1)
+        # predicted_token_ids = torch.where(predicted_token_ids == 3893, 1, predicted_token_ids)
+        # predicted_token_ids = torch.where(predicted_token_ids == 4997, 0, predicted_token_ids)
+        # loss = torch.where(predicted_token_ids == labels, 0, 1).sum() / predicted_token_ids.shape[0]
         return loss
 
     def training_step(self, batch, batch_idx):

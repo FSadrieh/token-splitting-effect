@@ -110,10 +110,8 @@ def main(args: TrainingArgs):
         )
 
         model_args["local_soft_prompt"] = args.saved_checkpoint_path
-        model = BasicLM(**model_args)
 
-    else:
-        model = BasicLM(**model_args)
+    model = BasicLM(**model_args)
 
     # Initializing tokenizer and resizing embeddings if necessary
     if not args.resume:
