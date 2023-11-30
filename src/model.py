@@ -110,14 +110,10 @@ class BasicLM(L.LightningModule):
         #loss = (loss_1 + loss_2) / 2
 
         # Calculate loss the token_id for negative is 4997 and for positive 3893
-        labels[labels==0] = 4997
-        labels[labels==1] = 3893
         loss = torch.nn.CrossEntropyLoss()(logits[:, -1], labels)
 
         # Loss alternative: penalize the model for predicting the wrong token without looking at the percentages
         # predicted_token_ids = logits[:, -1].argmax(axis=-1)
-        # predicted_token_ids = torch.where(predicted_token_ids == 3893, 1, predicted_token_ids)
-        # predicted_token_ids = torch.where(predicted_token_ids == 4997, 0, predicted_token_ids)
         # loss = torch.where(predicted_token_ids == labels, 0, 1).sum() / predicted_token_ids.shape[0]
         return loss
 

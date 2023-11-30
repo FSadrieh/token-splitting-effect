@@ -214,11 +214,13 @@ def make_tokenize_function(tokenizer, truncate, max_seq_length):
 
     # Define a tokenize function for processing text data
     def tokenize_function(examples):
-        return tokenizer(
+        tokenized =  tokenizer(
             examples["text"],
             max_length=max_seq_length,
             padding=True,
             truncation=truncate,
         )
+        tokenized["label"] = [tokenizer("negative", add_special_tokens=False)["input_ids"][0] if x == 0 else tokenizer("positive", add_special_tokens=False)["input_ids"][0] for x in examples["label"]]
+        return tokenized
 
     return tokenize_function
