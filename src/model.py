@@ -94,7 +94,6 @@ class BasicLM(L.LightningModule):
 
 
     def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
-        input_ids[:, -1] = self.tokenizer.mask_token_id
         # Forward pass through the model
         embedded_input = self.model.get_input_embeddings()(input_ids)
         prompt = self.soft_prompt(self.prompt_tokens.to(self.device)).unsqueeze(0).expand(embedded_input.shape[0], -1, -1)
@@ -104,17 +103,11 @@ class BasicLM(L.LightningModule):
         
         # Adjust attention mask for the concatenated prompt
         attention_mask = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device), attention_mask], dim=1)
+        labels = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device) * -100, labels], dim=1).long()
 
-        logits = self.model(inputs_embeds=inputs_embeds, attention_mask=attention_mask).logits
+        loss = self.model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
         #loss_2 = self.model_2(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
         #loss = (loss_1 + loss_2) / 2
-
-        # Calculate loss the token_id for negative is 4997 and for positive 3893
-        loss = torch.nn.CrossEntropyLoss()(logits[:, -1], labels)
-
-        # Loss alternative: penalize the model for predicting the wrong token without looking at the percentages
-        # predicted_token_ids = logits[:, -1].argmax(axis=-1)
-        # loss = torch.where(predicted_token_ids == labels, 0, 1).sum() / predicted_token_ids.shape[0]
         return loss
 
     def training_step(self, batch, batch_idx):

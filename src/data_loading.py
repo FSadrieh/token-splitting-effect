@@ -8,9 +8,12 @@ from typing import TYPE_CHECKING
 
 import datasets
 import lightning as L
+import torch
 from print_on_steroids import logger
 from torch.utils.data.dataloader import DataLoader
 from transformers import PreTrainedTokenizerFast, DefaultDataCollator
+
+from src.custom_data_collator import CustomDataCollator
 
 from dlib.frameworks.pytorch import get_rank
 
@@ -73,7 +76,8 @@ class LMDataModule(L.LightningDataModule):
         processed_datasets = datasets.load_from_disk(cache_path)
 
         # Initialize data collator for batching and padding
-        data_collator = DefaultDataCollator()
+        data_collator = CustomDataCollator(self.tokenizer)
+        #data_collator = DefaultDataCollator()
 
         # Assign datasets and data collator for training and validation
         self.train_dataset = processed_datasets["train"]
@@ -137,7 +141,7 @@ class LMDataModule(L.LightningDataModule):
     def process_dataset_in_chunks(self, tokenizer, train_val_datasets):
         """Expects input data to be one document per line. Tokenizes the documents and splits into chunks of max_sequence_legth."""
         tokenized_datasets = train_val_datasets.map(
-            make_tokenize_function(tokenizer, truncate=True, max_seq_length=self.max_length),
+            make_tokenize_function(tokenizer, max_seq_length=self.max_length),
             batched=True,
             num_proc=1,  # Should use only one process to leverage tokenizers parallelism
             remove_columns=["text"],  # Remove original text column after tokenization
@@ -178,7 +182,7 @@ class LMDataModule(L.LightningDataModule):
         
         # Create a tokenize function hash to ensure cache consistency
         # This is to prevent a rarely occurring bug where the hash of the tokenize function changes between runs
-        self.tokenize_function = self.tokenize_function if self.tokenize_function else make_tokenize_function(self.tokenizer, truncate = True, max_seq_length=self.max_length)
+        self.tokenize_function = self.tokenize_function if self.tokenize_function else make_tokenize_function(self.tokenizer, max_seq_length=self.max_length)
         tokenize_fn_hash = datasets.fingerprint.Hasher.hash(self.tokenize_function)
         
         # Define the directory and file path for the cached data
@@ -209,7 +213,7 @@ class LMDataModule(L.LightningDataModule):
             return False, cache_path
 
 
-def make_tokenize_function(tokenizer, truncate, max_seq_length):
+def make_tokenize_function(tokenizer, max_seq_length):
     """Needs to be outside of DataModule because of hashing error in dataset.map"""
 
     # Define a tokenize function for processing text data
@@ -218,9 +222,25 @@ def make_tokenize_function(tokenizer, truncate, max_seq_length):
             examples["text"],
             max_length=max_seq_length,
             padding=True,
-            truncation=truncate,
+            truncation=True,
         )
-        tokenized["label"] = [tokenizer("negative", add_special_tokens=False)["input_ids"][0] if x == 0 else tokenizer("positive", add_special_tokens=False)["input_ids"][0] for x in examples["label"]]
+
+        # scalar_labels = torch.tensor([tokenizer("negative", add_special_tokens=False)["input_ids"][0] if x == 0 else tokenizer("positive", add_special_tokens=False)["input_ids"][0] for x in examples["label"]])
+        # labels = torch.ones_like(torch.tensor(tokenized["input_ids"])) * -100
+
+        # for i in range(len(tokenized["input_ids"])):
+        #     input_ids = tokenized["input_ids"][i]
+        #     label = labels[i]
+        #     if input_ids[-1] != tokenizer.pad_token_id:
+        #         input_ids[-1] = tokenizer.mask_token_id
+        #         label[-1] = scalar_labels[i]
+        #     else:
+        #         pad_index = input_ids.index(tokenizer.pad_token_id)
+        #         input_ids[pad_index] = tokenizer.mask_token_id
+        #         label[pad_index] = scalar_labels[i]
+
+        
+        # tokenized["label"] = label.tolist()
         return tokenized
 
     return tokenize_function
