@@ -12,9 +12,10 @@ class CustomDataCollator(DataCollatorForWholeWordMask):
             examples: [{"input_ids": [], "attention_mask": [], "special_tokens_mask": []}], where the outer array is the batch
         It converts these examples to a batch with a masked token at the end."""
 
+        scalar_labels = torch.stack([torch.tensor(example["label"]) for example in examples])
         input_ids = torch.stack([torch.tensor(example["input_ids"]) for example in examples])
         attention_mask = torch.stack([torch.tensor(example["attention_mask"]) for example in examples])
-        scalar_labels = torch.tensor([self.tokenizer("negative", add_special_tokens=False)["input_ids"][0] if example["label"] == 0 else self.tokenizer("positive", add_special_tokens=False)["input_ids"][0] for example in examples])
+        
         labels = torch.ones_like(input_ids) * -100
 
         for i in range(input_ids.shape[0]):

@@ -29,8 +29,9 @@ from simple_parsing import field, parse
 @dataclass
 class Args:
     out_dir: str = field(alias="-o")
+    "Path to data directory."
 
-    dataset: Literal["glue_sst2", "imdb"] = field(default="imdb")
+    dataset: Literal["glue_sst2", "imdb", "emotion"] = field(default="imdb")
     "HF dataset. Pile currently uses a mirror with copyrighted material removed."
 
     max_train_size: int = field(default=50_000_000)
@@ -77,13 +78,15 @@ def main(args: Args):
         # Disable caching because we write the end result to disk anyways. Intermediary caches just clutter the disk!
         logger.info("Disabling caching to conserve disk space.")
         datasets.fingerprint.disable_caching()
+        
+    output_dir = os.join(args.out_dir, args.dataset)
 
-    os.makedirs(args.out_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
     logger.info("Downloading dataset. This can take some time, so sit back and relax...")
 
     tmp_cache_dir = None
     if args.conserve_disk_space:
-        tmp_cache_dir = os.path.join(args.out_dir, args.language, "tmp_download_cache")
+        tmp_cache_dir = os.path.join(output_dir, args.language, "tmp_download_cache")
         os.makedirs(tmp_cache_dir, exist_ok=True)
 
     ##### Load dataset #####
@@ -108,6 +111,14 @@ def main(args: Args):
         dataset = dataset.rename_column("sentence", "text")
         dataset = dataset.remove_columns(["idx"])
         print(dataset)
+    elif args.dataset == "emotion":
+        dataset = load_dataset(
+            "dair-ai/emotion",
+            split=args.split,
+            cache_dir=tmp_cache_dir,
+            streaming=args.stream,
+            num_proc=None if args.stream else args.processes,
+        )
 
 
     ##### Split into train/dev/test #####
@@ -141,7 +152,7 @@ def main(args: Args):
 
     ##### Write to disk #####
     logger.info("Writing data...")
-    output_dir = Path(args.out_dir)
+    output_dir = Path(output_dir)
     os.makedirs(str(output_dir), exist_ok=True)
     PERFORMANT_BUFFER_SIZE_BYTES = 1024 * 1024 * 100  # 100 MB
 

@@ -42,7 +42,7 @@ class LMDataModule(L.LightningDataModule):
 
         self.train_file = str(train_file)
         self.val_file = str(val_file)
-        self.tokenizer_path = self.args.tokenizer_path or self.args.hf_model_name_1
+        self.tokenizer_path = self.args.tokenizer_path or self.args.hf_model_names[0]
         self.local_rank = get_rank()
 
         # Initialize tokenizer and configure max token length for the dataset
@@ -141,7 +141,7 @@ class LMDataModule(L.LightningDataModule):
     def process_dataset_in_chunks(self, tokenizer, train_val_datasets):
         """Expects input data to be one document per line. Tokenizes the documents and splits into chunks of max_sequence_legth."""
         tokenized_datasets = train_val_datasets.map(
-            make_tokenize_function(tokenizer, max_seq_length=self.max_length),
+            make_tokenize_function(tokenizer, max_seq_length=self.max_length, data_dir=self.args.data_dir),
             batched=True,
             num_proc=1,  # Should use only one process to leverage tokenizers parallelism
             remove_columns=["text"],  # Remove original text column after tokenization
@@ -182,7 +182,7 @@ class LMDataModule(L.LightningDataModule):
         
         # Create a tokenize function hash to ensure cache consistency
         # This is to prevent a rarely occurring bug where the hash of the tokenize function changes between runs
-        self.tokenize_function = self.tokenize_function if self.tokenize_function else make_tokenize_function(self.tokenizer, max_seq_length=self.max_length)
+        self.tokenize_function = self.tokenize_function if self.tokenize_function else make_tokenize_function(self.tokenizer, max_seq_length=self.max_length, data_dir=self.args.data_dir)
         tokenize_fn_hash = datasets.fingerprint.Hasher.hash(self.tokenize_function)
         
         # Define the directory and file path for the cached data
@@ -213,7 +213,7 @@ class LMDataModule(L.LightningDataModule):
             return False, cache_path
 
 
-def make_tokenize_function(tokenizer, max_seq_length):
+def make_tokenize_function(tokenizer, max_seq_length, data_dir):
     """Needs to be outside of DataModule because of hashing error in dataset.map"""
 
     # Define a tokenize function for processing text data
@@ -224,23 +224,13 @@ def make_tokenize_function(tokenizer, max_seq_length):
             padding=True,
             truncation=True,
         )
-
-        # scalar_labels = torch.tensor([tokenizer("negative", add_special_tokens=False)["input_ids"][0] if x == 0 else tokenizer("positive", add_special_tokens=False)["input_ids"][0] for x in examples["label"]])
-        # labels = torch.ones_like(torch.tensor(tokenized["input_ids"])) * -100
-
-        # for i in range(len(tokenized["input_ids"])):
-        #     input_ids = tokenized["input_ids"][i]
-        #     label = labels[i]
-        #     if input_ids[-1] != tokenizer.pad_token_id:
-        #         input_ids[-1] = tokenizer.mask_token_id
-        #         label[-1] = scalar_labels[i]
-        #     else:
-        #         pad_index = input_ids.index(tokenizer.pad_token_id)
-        #         input_ids[pad_index] = tokenizer.mask_token_id
-        #         label[pad_index] = scalar_labels[i]
-
         
-        # tokenized["label"] = label.tolist()
+        if "emotion" in data_dir.name:
+            scalar_labels = torch.tensor([tokenizer("sadness", add_special_tokens=False)["input_ids"][0] if x == 0 else tokenizer("joy", add_special_tokens=False)["input_ids"][0] if x == 1 else tokenizer("love", add_special_tokens=False)["input_ids"][0] if x == 2 else tokenizer("anger", add_special_tokens=False)["input_ids"][0] if x == 3 else tokenizer("fear", add_special_tokens=False)["input_ids"][0] if x == 4 else tokenizer("surprise", add_special_tokens=False)["input_ids"][0] for x in examples["label"]])
+        else:
+            scalar_labels = torch.tensor([tokenizer("negative", add_special_tokens=False)["input_ids"][0] if x == 0 else tokenizer("positive", add_special_tokens=False)["input_ids"][0] for x in examples["label"]])
+
+        tokenized["label"] = scalar_labels
         return tokenized
 
     return tokenize_function
