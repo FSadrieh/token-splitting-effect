@@ -79,7 +79,7 @@ def main(args: Args):
         logger.info("Disabling caching to conserve disk space.")
         datasets.fingerprint.disable_caching()
         
-    output_dir = os.join(args.out_dir, args.dataset)
+    output_dir = os.path.join(args.out_dir, args.dataset)
 
     os.makedirs(output_dir, exist_ok=True)
     logger.info("Downloading dataset. This can take some time, so sit back and relax...")
