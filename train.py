@@ -87,11 +87,10 @@ def main(args: TrainingArgs):
 
     ################# Construct model ##############
 
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(args.tokenizer_path or args.hf_model_name_1, use_fast=True)
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(args.tokenizer_path or args.hf_model_names[0], use_fast=True)
     # Resume from checkpoint if specified
     model_args = dict(
-        model_name_or_path_1=args.hf_model_name_1,
-        model_name_or_path_2=args.hf_model_name_2,
+        model_names_or_paths=args.hf_model_names,
         tokenizer=tokenizer,
         from_scratch=args.from_scratch,
         learning_rate=args.learning_rate,

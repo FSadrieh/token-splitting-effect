@@ -14,11 +14,8 @@ class TrainingArgs:
     """
 
     data_dir: Path = field(alias="-d")
-
-    hf_model_name_1: str = field(default="google/multiberts-seed_1", alias="--model_1")
-    "HuggingFace model identifier. This is used to construct the model architecture and load pretrained weights if not specified otherwise."
-
-    hf_model_name_2: str = field(default=None, alias="--model_2")
+    
+    hf_model_names: list[str] = list_field(default=["google/multiberts-seed_1"], alias="--models")
     "HuggingFace model identifier. This is used to construct the model architecture and load pretrained weights if not specified otherwise."
 
     from_scratch: bool = field(default=False)
@@ -184,8 +181,8 @@ class TrainingArgs:
         assert self.batch_size == self.micro_batch_size * self.num_devices * self.gradient_accumulation_steps
 
         if self.tokenizer_path is None:
-            self.tokenizer_path = self.hf_model_name_1
-            assert self.hf_model_name_1 is not None
+            self.tokenizer_path = self.hf_model_names[0]
+            assert self.hf_model_names[0] is not None
 
         if self.eval_micro_batch_size is None:
             self.eval_micro_batch_size = self.micro_batch_size
