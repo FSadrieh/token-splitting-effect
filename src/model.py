@@ -15,7 +15,7 @@ from warmup_scheduler import GradualWarmupScheduler
 class BasicLM(L.LightningModule):
     def __init__(
         self,
-        model_name_or_path_1: str,
+        model_names_or_paths: list[str],
         tokenizer: PreTrainedTokenizerFast,
         from_scratch: bool,
         learning_rate: float,
@@ -37,30 +37,25 @@ class BasicLM(L.LightningModule):
         if save_hyperparameters:
             self.save_hyperparameters(ignore=["save_hyperparameters"])
         
-        # Load configuration and initialize the first transformer model
-        config_1 = AutoConfig.from_pretrained(model_name_or_path_1, return_dict=True)
-        self.model: PreTrainedModel = (
-            AutoModelForMaskedLM.from_pretrained(model_name_or_path_1, config=config_1)
-            if not from_scratch
-            else AutoModelForMaskedLM.from_config(config=config_1)
-        )
-
-        # Optionally load a second transformer model, if provided
-        if model_name_or_path_2:
-            config_2 = AutoConfig.from_pretrained(model_name_or_path_2, return_dict=True)
-            self.model_2: PreTrainedModel = (
-                AutoModelForMaskedLM.from_pretrained(model_name_or_path_2, config=config_2)
+        self.models = []
+        for model_name_or_path in model_names_or_paths:
+            if model_name_or_path is None:
+                raise ValueError("model_name_or_path cannot be None")
+            
+            # Load configuration and initialize the first transformer model
+            config = AutoConfig.from_pretrained(model_name_or_path, return_dict=True)
+            model: PreTrainedModel = (
+                AutoModelForMaskedLM.from_pretrained(model_name_or_path, config=config)
                 if not from_scratch
-                else AutoModelForMaskedLM.from_config(config=config_2)
+                else AutoModelForMaskedLM.from_config(config=config)
             )
-            for param in self.model_2.parameters():
+            
+            for param in model.parameters():
                 param.requires_grad = False
-        else:
-            self.model_2 = None
+            
+            self.models.append(model)
 
-        # Freeze parameters of the model(s) for prompt-based tuning
-        for param in self.model.parameters():
-            param.requires_grad = False
+        self.model = self.models[0]
 
         # Initialize a prompt embedding layer
         # This snippet is inspired by https://github.com/huggingface/peft/blob/main/src/peft/tuners/prompt_tuning/model.py
@@ -94,31 +89,34 @@ class BasicLM(L.LightningModule):
 
 
     def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
-        # Forward pass through the model
-        embedded_input = self.model.get_input_embeddings()(input_ids)
-        prompt = self.soft_prompt(self.prompt_tokens.to(self.device)).unsqueeze(0).expand(embedded_input.shape[0], -1, -1)
-
-        # Generate prompt embeddings and concatenate with input embeddings
-        inputs_embeds = torch.cat([prompt, embedded_input], dim=1)
+        prompt = self.soft_prompt(self.prompt_tokens.to(self.device)).unsqueeze(0).expand(input_ids.shape[0], -1, -1)
         
         # Adjust attention mask for the concatenated prompt
         attention_mask = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device), attention_mask], dim=1)
         labels = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device) * -100, labels], dim=1).long()
-
-        loss = self.model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
-        #loss_2 = self.model_2(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels).loss
-        #loss = (loss_1 + loss_2) / 2
-        return loss
+        
+        outputs = []
+        for model in self.models:
+            embedded_input = model.get_input_embeddings()(input_ids)
+        
+            # Generate prompt embeddings and concatenate with input embeddings
+            inputs_embeds = torch.cat([prompt, embedded_input], dim=1)
+            
+            outputs.append(model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels))
+        
+        return outputs
 
     def training_step(self, batch, batch_idx):
         # Perform a training step
-        loss = self(**batch)
+        outputs = self(**batch)
+        loss = torch.stack([output.loss for output in outputs]).mean()
         self.log("train/loss", loss, on_step=True, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         # Perform a validation step
-        loss = self(**batch)
+        outputs = self(**batch)
+        loss = torch.stack([output.loss for output in outputs]).mean()
         self.log("val/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):
@@ -128,7 +126,7 @@ class BasicLM(L.LightningModule):
                 f"Using lr: {self.learning_rate}, weight decay: {self.weight_decay} and warmup steps: {self.warmup_period}"
             )
 
-        named_parameters = list(self.model.named_parameters()) + list(self.soft_prompt.named_parameters())
+        named_parameters = list(self.soft_prompt.named_parameters())
 
         # Filter out parameters that are not optimized (requires_grad == False)
         optimized_named_parameters = [(n, p) for n, p in named_parameters if p.requires_grad]
