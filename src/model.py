@@ -24,9 +24,7 @@ class BasicLM(L.LightningModule):
         beta2: float,
         lr_schedule: str,
         warmup_period: int,
-        eval_interval: int,
         prompt_length: int,
-        model_name_or_path_2: str | None = None,
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
         local_soft_prompt: str | None = None,
@@ -83,7 +81,6 @@ class BasicLM(L.LightningModule):
         self.beta2 = beta2
         self.lr_schedule = lr_schedule
         self.warmup_period = warmup_period
-        self.eval_interval = eval_interval
         self.epsilon = epsilon
         self.tokenizer = tokenizer
 
@@ -161,7 +158,7 @@ class BasicLM(L.LightningModule):
                     total_epoch=self.warmup_period,
                     after_scheduler=scheduler,
                 )
-            scheduler_config = {"frequency": self.eval_interval, "monitor": "train/loss"}
+            scheduler_config = {"frequency": 1, "monitor": "train/loss"}
         else:
             scheduler_name = self.lr_schedule
             if scheduler_name == "constant" and self.warmup_period > 0:
@@ -170,7 +167,7 @@ class BasicLM(L.LightningModule):
                 scheduler_name,
                 optimizer,
                 num_warmup_steps=int(self.warmup_period),
-                num_training_steps=self.trainer.max_steps,
+                num_training_steps=self.trainer.num_training_batches * self.trainer.max_epochs,
             )
             scheduler_config = {"frequency": 1}
 

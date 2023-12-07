@@ -99,7 +99,6 @@ def main(args: TrainingArgs):
         beta2=args.beta2,
         lr_schedule=args.lr_schedule,
         warmup_period=args.warmup_period,
-        eval_interval=args.eval_interval,
         prompt_length=args.prompt_length,
         init_text=args.init_text,
     )
@@ -143,7 +142,7 @@ def main(args: TrainingArgs):
         monitor="val/loss",
         mode="min",
         auto_insert_metric_name=False,
-        every_n_train_steps=int(args.save_interval),
+        every_n_epochs=int(args.save_interval),
     )
     callbacks = [checkpoint_callback, wandb_disk_cleanup_callback, lr_monitor, ProgressMetricCallback()]
     if args.accelerator == "cuda":
@@ -154,14 +153,9 @@ def main(args: TrainingArgs):
         logger.info("Disabling SLURMEnvironment (we use lightning's native DDP launcher)")
         plugins = [LightningEnvironment()]
 
-    # lightning wants val_check_interval in num forward passes (iters) not num optimization steps
-    val_frequency_in_iters = args.eval_interval * args.gradient_accumulation_steps
-
     # Initialize PyTorch Lightning trainer
     trainer = Trainer(
-        max_steps=args.training_goal,
-        val_check_interval=val_frequency_in_iters,
-        check_val_every_n_epoch=None,  # validation based on steps instead of epochs
+        max_epochs=args.training_goal,
         devices=args.num_devices,
         accelerator=args.accelerator,
         strategy=args.distributed_strategy,
@@ -173,7 +167,6 @@ def main(args: TrainingArgs):
         gradient_clip_val=args.grad_clip,
         accumulate_grad_batches=args.gradient_accumulation_steps,
         fast_dev_run=args.fast_dev_run,
-        limit_val_batches=None if args.eval_samples == -1 else (args.eval_samples // args.eval_micro_batch_size),
         inference_mode=not args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
     )
 
@@ -181,7 +174,6 @@ def main(args: TrainingArgs):
         logger.info(
             f"Total optimizer steps: {args.training_goal} | "
             f"LR warmup steps: {args.warmup_period} | "
-            f"Validation Frequency: {args.eval_interval} | "
             f"Model Log Frequency: {args.save_interval} | "
             f"Effective batch size: {args.batch_size} | "
             f"Micro batch size (per device and forward pass): {args.eval_micro_batch_size} | "
@@ -215,9 +207,6 @@ def main(args: TrainingArgs):
 
             save_dir = Path(checkpoint_callback.dirpath)
             os.makedirs(save_dir, exist_ok=True)
-            # TODO: Add functionality to save the model's state dictionary (state_dict).
-            # This allows for greater flexibility in loading the model's parameters into different architectures
-            # or frameworks.
             torch.save(model.soft_prompt.state_dict(), save_dir / "soft_prompt.pt")
 
             logger.info("Collecting PL checkpoint for wandb...")

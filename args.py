@@ -42,13 +42,8 @@ class TrainingArgs:
     ##### Training constants ######
     ###############################
 
-    training_goal: int = field(default=1_000)
-    "Number of steps to run."
-    eval_interval: float = field(default=0.1)
-    "Interval between evaluations. If < 1, use as percentage of training_goal."
-
-    eval_samples: int = field(default=-1)
-    "Number of samples on the val dataset during evaluation. If -1, use full val dataset."
+    training_goal: int = field(default=10)
+    "Number of epochs to run."
 
     save_interval: int | float = field(default=0.1)
     "Interval between model checkpoints. If < 1, use as percentage of training_goal."
@@ -163,8 +158,6 @@ class TrainingArgs:
 
         self.iter_batch_size = self.micro_batch_size * self.num_devices
 
-        if self.eval_interval < 1:
-            self.eval_interval = int(self.eval_interval * self.training_goal)
         if self.save_interval < 1:
             self.save_interval = int(self.save_interval * self.training_goal)
         if self.warmup_period < 1:
