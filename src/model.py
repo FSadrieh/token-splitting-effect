@@ -94,6 +94,7 @@ class BasicLM(L.LightningModule):
         
         outputs = []
         for model in self.models:
+            model.to(self.device)
             embedded_input = model.get_input_embeddings()(input_ids)
         
             # Generate prompt embeddings and concatenate with input embeddings
@@ -148,6 +149,8 @@ class BasicLM(L.LightningModule):
             eps=self.epsilon,  # You can also tune this
         )
 
+        self.trainer.fit_loop.setup_data()
+
         # Configure learning rate scheduler based on the selected strategy
         if self.lr_schedule == "reduce_on_plateau":
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, verbose=True)
@@ -167,7 +170,7 @@ class BasicLM(L.LightningModule):
                 scheduler_name,
                 optimizer,
                 num_warmup_steps=int(self.warmup_period),
-                num_training_steps=self.trainer.num_training_batches * self.trainer.max_epochs,
+                num_training_steps=self.trainer.max_steps if self.trainer.max_steps != -1 else int(int(len(self.trainer.train_dataloader) / int(self.trainer.accumulate_grad_batches)) * self.trainer.max_epochs),
             )
             scheduler_config = {"frequency": 1}
 
