@@ -14,8 +14,8 @@ class TrainingArgs:
     """
 
     data_dir: Path = field(alias="-d")
-
-    hf_model_name: str = field(default="roberta-base", alias="--model")
+    
+    hf_model_names: list[str] = list_field(default=["google/multiberts-seed_1"], alias="--models")
     "HuggingFace model identifier. This is used to construct the model architecture and load pretrained weights if not specified otherwise."
 
     from_scratch: bool = field(default=False)
@@ -26,8 +26,8 @@ class TrainingArgs:
 
     resume: bool = False
 
-    language_modeling_objective: Literal["mlm", "clm"] = field(default="mlm")
-    "Whether to train a masked language model or a causal language model."
+    training_objective: Literal["mlm", "clm", "classification"] = field(default="classification")
+    "Whether to train a masked language model, a causal language model, or a classification model."
 
     train_file: str = field(default="train.jsonl")
     "Name of the training file."
@@ -42,15 +42,8 @@ class TrainingArgs:
     ##### Training constants ######
     ###############################
 
-    base_unit: Literal["samples", "tokens", "optimizer-steps", "iters"] = field(default="optimizer-steps")
-    "Unit of all training constants. They will be converted to optimizer_steps in __post_init__."
-
-    training_goal: int = field(default=100_000)
-    eval_interval: float = field(default=0.1)
-    "Interval between evaluations. If < 1, use as percentage of training_goal."
-
-    eval_samples: int = field(default=-1)
-    "Number of samples on the val dataset during evaluation. If -1, use full val dataset."
+    training_goal: int = field(default=10)
+    "Number of epochs to run."
 
     save_interval: int | float = field(default=0.1)
     "Interval between model checkpoints. If < 1, use as percentage of training_goal."
@@ -68,7 +61,7 @@ class TrainingArgs:
     "The sequence length of samples."
 
     learning_rate: float = field(default=3e-4)
-    batch_size: int = field(default=16, alias="-b")
+    batch_size: int = field(default=256, alias="-b")
     weight_decay: float = 0.1
     beta1: float = 0.9
     beta2: float = 0.95
@@ -146,6 +139,16 @@ class TrainingArgs:
     fast_dev_run: bool = field(default=False)
     "Do fast run through training and validation with reduced sizes."
 
+    ####################################################
+    ###### Explainable Soft Prompts specific args ######
+    ####################################################
+
+    prompt_length: int = field(default=30)
+    "Length of soft prompt to be trained."
+
+    init_text: str = field(default=None)
+    "Initial text to be used for soft prompt initialization."
+
     def __post_init__(self):
         assert self.num_devices > 0
         if self.micro_batch_size is None:
@@ -155,8 +158,6 @@ class TrainingArgs:
 
         self.iter_batch_size = self.micro_batch_size * self.num_devices
 
-        if self.eval_interval < 1:
-            self.eval_interval = int(self.eval_interval * self.training_goal)
         if self.save_interval < 1:
             self.save_interval = int(self.save_interval * self.training_goal)
         if self.warmup_period < 1:
@@ -173,30 +174,11 @@ class TrainingArgs:
         assert self.batch_size == self.micro_batch_size * self.num_devices * self.gradient_accumulation_steps
 
         if self.tokenizer_path is None:
-            self.tokenizer_path = self.hf_model_name
-            assert self.hf_model_name is not None
+            self.tokenizer_path = self.hf_model_names[0]
+            assert self.hf_model_names[0] is not None
 
         if self.eval_micro_batch_size is None:
             self.eval_micro_batch_size = self.micro_batch_size
-
-        # Calculate training constants
-        if self.base_unit == "samples":
-            UNITS_PER_STEP = self.batch_size
-        elif self.base_unit == "tokens":
-            assert self.block_size is not None, "block_size must be set if base_unit is tokens"
-            UNITS_PER_STEP = self.batch_size * self.block_size
-        elif self.base_unit == "optimizer-steps":
-            UNITS_PER_STEP = 1
-        elif self.base_unit == "iters":
-            UNITS_PER_STEP = self.gradient_accumulation_steps
-        else:
-            raise ValueError(f"Unknown training goal unit: {self.base_unit}")
-
-        self.training_goal = int(self.training_goal / UNITS_PER_STEP)
-        self.eval_interval = int(self.eval_interval / UNITS_PER_STEP)
-        self.save_interval = int(self.save_interval / UNITS_PER_STEP)
-        self.warmup_period = int(self.warmup_period / UNITS_PER_STEP)
-        self.lr_decay_period = int(self.lr_decay_period / UNITS_PER_STEP)
 
         if self.preprocessing_workers == -1:
             # Set to all available CPUs, handle SLURM case when only some CPUs are available to the job

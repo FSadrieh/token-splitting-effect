@@ -140,3 +140,8 @@ dmypy.json
 
 # everything that has to do with run-results
 /template
+
+# configs
+dev_cuda.yml
+dev.yml
+.vscode

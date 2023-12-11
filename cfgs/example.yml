@@ -8,7 +8,7 @@ batch_size: 512
 weight_decay: 0.1
 learning_rate: 2e-4
 grad_clip: 1.0
-hf_model_name: roberta-base
+hf_model_name_1: roberta-base
 precision: bf16-mixed
 wandb_tags: ["research-template"]
 data_dir: "./data/mock"
