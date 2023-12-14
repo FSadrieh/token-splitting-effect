@@ -29,6 +29,7 @@ class BasicLM(L.LightningModule):
         save_hyperparameters: bool = True,
         local_soft_prompt: str | None = None,
         init_text: str | None = None,
+        init_embedding_model: str | None = None,
     ) -> None:
         # Initialize the LightningModule
         super().__init__()
@@ -72,7 +73,12 @@ class BasicLM(L.LightningModule):
                     num_reps = math.ceil(prompt_length / len(init_ids))
                     init_ids = init_ids * num_reps
                 init_ids = init_ids[:prompt_length]
-                prompt_token_weights = self.model.get_input_embeddings()(torch.LongTensor(init_ids)).detach().clone()
+                if init_embedding_model:
+                    init_model = AutoModelForMaskedLM.from_pretrained(init_embedding_model)
+                    embedding = init_model.get_input_embeddings()
+                else:
+                    embedding = self.model.get_input_embeddings()
+                prompt_token_weights = embedding(torch.LongTensor(init_ids)).detach().clone()
                 self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
 
         self.learning_rate = learning_rate

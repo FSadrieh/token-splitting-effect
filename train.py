@@ -101,6 +101,7 @@ def main(args: TrainingArgs):
         warmup_period=args.warmup_period,
         prompt_length=args.prompt_length,
         init_text=args.init_text,
+        init_embedding_model=args.init_embedding_model,
     )
     if args.saved_checkpoint_path:
         args.saved_checkpoint_path = check_for_wandb_checkpoint_and_download_if_necessary(

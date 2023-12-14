@@ -149,6 +149,9 @@ class TrainingArgs:
     init_text: str = field(default=None)
     "Initial text to be used for soft prompt initialization."
 
+    init_embedding_model: str = field(default=None)
+    "Model to be used for soft prompt initialization. If None the first model from `hf_model_names` will be used."
+
     def __post_init__(self):
         assert self.num_devices > 0
         if self.micro_batch_size is None:
