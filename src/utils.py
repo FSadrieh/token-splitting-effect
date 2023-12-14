@@ -32,7 +32,7 @@ def create_init_texts(init_texts: list, model_names: list, prompt_length: int, e
     for init_text in init_texts:
         for model_name in model_names:
             init_text_list.append(create_init_text(init_text, model_name, embedding_size, prompt_length))
-            init_texts_names.append(f"{init_text.split(' ')[:3]}_{model_name}")
+            init_texts_names.append(f"{' '.join(init_text.split(' ')[:3])}_{model_name}")
     return init_text_list, init_texts_names
 
 

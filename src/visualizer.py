@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 
 from utils import create_soft_prompts, create_init_texts, average
 
-DEFAULT_COLORS = ["blue", "orange", "green", "red", "purple", "brown", "pink", "gray", "olive", "cyan"]
+DEFAULT_COLORS = ["blue", "orange", "green", "red", "purple", "brown", "pink", "gray", "olive", "cyan", "black"]
 
 
 def arg_parser():
@@ -104,7 +104,7 @@ def prepare_init_texts(
 ) -> (torch.Tensor, list):
     if not init_texts:
         return soft_prompts, soft_prompt_names
-    init_texts = init_texts.split(",")
+    init_texts = init_texts.split(";")
     init_texts_list, init_text_names = create_init_texts(init_texts, model_names, prompt_length, embedding_size)
     init_texts, _ = average(init_texts_list, avg)
     soft_prompt_names.extend(init_text_names)
