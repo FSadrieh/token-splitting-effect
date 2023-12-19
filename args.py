@@ -149,8 +149,11 @@ class TrainingArgs:
     init_text: str = field(default=None)
     "Initial text to be used for soft prompt initialization."
 
-    init_embedding_model: str = field(default=None)
-    "Model to be used for soft prompt initialization. If None the first model from `hf_model_names` will be used."
+    init_embedding_models: str = field(default=None)
+    "Models to be used for soft prompt initialization. Specify a comma-seperated list. If None the first model from `hf_model_names` will be used."
+
+    init_embedding_mode: Literal["normal", "average", "mix"] = field(default="mean")
+    "Will only be used if init_embedding_models is used. Normal will use the first model, average will average the embeddings of all models, mix will cut the embeddings into equal parts and embedd each part with a different model."
 
     def __post_init__(self):
         assert self.num_devices > 0
