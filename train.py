@@ -14,13 +14,13 @@ from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, log_slurm_info, wait_for_debugger
-from src.data_loading import LMDataModule
-from src.helpers import (
+from training.data_loading import LMDataModule
+from training.helpers import (
     ProgressMetricCallback,
     check_checkpoint_path_for_wandb,
     check_for_wandb_checkpoint_and_download_if_necessary,
 )
-from src.model import BasicLM
+from training.model import BasicLM
 
 WANDB_PROJECT = "explainable-soft-prompts"
 WANDB_ENTITY = "raphael-team"

@@ -1,5 +1,6 @@
 import argparse
 import torch
+import os
 
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
@@ -82,7 +83,7 @@ def plot_embedding_space(
         )
         lower_bound = upper_bound
     ax.legend()
-    fig.savefig(output_path)
+    fig.savefig(os.path.join("visualizations", output_path))
 
 
 def prepare_soft_prompts(

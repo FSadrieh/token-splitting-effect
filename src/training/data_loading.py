@@ -11,9 +11,9 @@ import lightning as L
 import torch
 from print_on_steroids import logger
 from torch.utils.data.dataloader import DataLoader
-from transformers import PreTrainedTokenizerFast, DefaultDataCollator
+from transformers import PreTrainedTokenizerFast
 
-from src.custom_data_collator import CustomDataCollator
+from training.custom_data_collator import CustomDataCollator
 
 from dlib.frameworks.pytorch import get_rank
 

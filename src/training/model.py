@@ -25,12 +25,12 @@ class BasicLM(L.LightningModule):
         lr_schedule: str,
         warmup_period: int,
         prompt_length: int,
+        init_embedding_mode: str,
         epsilon: float = 1e-8,
         save_hyperparameters: bool = True,
         local_soft_prompt: str | None = None,
         init_text: str | None = None,
         init_embedding_models: str | None = None,
-        init_embedding_mode: str,
     ) -> None:
         # Initialize the LightningModule
         super().__init__()
