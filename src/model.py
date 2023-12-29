@@ -67,7 +67,7 @@ class BasicLM(L.LightningModule):
             self.soft_prompt.load_state_dict(torch.load(local_soft_prompt))
         else:
             if init_text:
-                init_ids = tokenizer(init_text)["input_ids"]
+                init_ids = tokenizer(init_text, add_special_tokens=False)["input_ids"]
                 if len(init_ids) > prompt_length:
                     init_ids = init_ids[:prompt_length]
                 elif len(init_ids) < prompt_length:

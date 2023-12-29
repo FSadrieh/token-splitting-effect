@@ -143,7 +143,7 @@ class TrainingArgs:
     ###### Explainable Soft Prompts specific args ######
     ####################################################
 
-    prompt_length: int = field(default=30)
+    prompt_length: int = field(default=16)
     "Length of soft prompt to be trained."
 
     init_text: str = field(default=None)

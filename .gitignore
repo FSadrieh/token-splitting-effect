@@ -1,4 +1,7 @@
 data/*
+visualizations/*
+cfgs/*
+checkpoints/*
 !data/mock/
 data/mock/tokenized/*
 logs/
