@@ -1,6 +1,8 @@
 import argparse
 import torch
 
+from src.utils import create_init_text, create_soft_prompts
+
 
 def arg_parser():
     parser = argparse.ArgumentParser()
@@ -18,39 +20,6 @@ def arg_parser():
     return parser.parse_args()
 
 
-def create_soft_prompt(prompt_length: int, embedding_size: int, soft_prompt_name: str) -> torch.Tensor:
-    soft_prompt_path = f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/soft_prompt.pt"
-    soft_prompt = torch.nn.Embedding(prompt_length, embedding_size)
-    soft_prompt.load_state_dict(torch.load(soft_prompt_path))
-    prompt_tokens = torch.arange(prompt_length).long()
-    return soft_prompt(prompt_tokens)
-
-
-def create_init_text(init_text: str, embedding_size: int, tokenizer: str, prompt_length: int) -> torch.Tensor:
-    """
-    This function mirrors the code in src/model.py to get the init text, to see how much the soft prompt changed
-    """
-    from transformers import AutoTokenizer
-    import math
-    from transformers.models.auto.modeling_auto import AutoModelForMaskedLM
-
-    model = AutoModelForMaskedLM.from_pretrained(tokenizer)
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer, use_fast=True)
-    soft_prompt = torch.nn.Embedding(prompt_length, embedding_size)
-
-    init_ids = tokenizer(init_text)["input_ids"]
-    if len(init_ids) > prompt_length:
-        init_ids = init_ids[:prompt_length]
-    elif len(init_ids) < prompt_length:
-        num_reps = math.ceil(prompt_length / len(init_ids))
-        init_ids = init_ids * num_reps
-    init_ids = init_ids[:prompt_length]
-    prompt_token_weights = model.get_input_embeddings()(torch.LongTensor(init_ids)).detach().clone()
-    soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
-    prompt_tokens = torch.arange(prompt_length).long()
-    return soft_prompt(prompt_tokens)
-
-
 def calculate_sim(soft_prompt_1: torch.Tensor, soft_prompt_2: torch.Tensor, distance_metric: str, pre_averaging: bool) -> float:
     if pre_averaging:
         soft_prompt_1 = torch.mean(soft_prompt_1, dim=1)
@@ -61,7 +30,7 @@ def calculate_sim(soft_prompt_1: torch.Tensor, soft_prompt_2: torch.Tensor, dist
     elif distance_metric in ["euclidean", "euclidean_sim"]:
         distance = torch.nn.functional.pairwise_distance(soft_prompt_1, soft_prompt_2, p=2)
         if distance_metric == "euclidean_sim":
-            if not pre_averaging:  # TODO: Check if this is correct
+            if not pre_averaging:
                 max_distance = torch.max(distance)
                 sim = 1 - (distance / max_distance)
             else:
@@ -81,17 +50,13 @@ def calculate_sim(soft_prompt_1: torch.Tensor, soft_prompt_2: torch.Tensor, dist
 def main():
     args = arg_parser()
     soft_prompt_names = args.soft_prompt_names.split(",")
-    soft_prompt_list = []
-
-    # Creates a soft prompt for each soft prompt name
-    for soft_prompt_name in soft_prompt_names:
-        soft_prompt_list.append(create_soft_prompt(args.prompt_length, args.embedding_size, soft_prompt_name))
+    soft_prompt_list = create_soft_prompts(soft_prompt_names, args.prompt_length, args.embedding_size)
 
     # Creates the initial soft prompt if specified
     if args.init_text is not None:
         if args.tokenizer is None:
             raise ValueError("You need to specify a tokenizer if you want to use an init text")
-        soft_prompt_list.append(create_init_text(args.init_text, args.embedding_size, args.tokenizer, args.prompt_length))
+        soft_prompt_list.append(create_init_text(args.init_text, args.tokenizer, args.embedding_size, args.prompt_length))
         soft_prompt_names.append("init_text")
 
     # If there is only one soft prompt, there is nothing to compare. (At this stage the init text is already added to the list)
