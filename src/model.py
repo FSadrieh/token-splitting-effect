@@ -29,6 +29,8 @@ class BasicLM(L.LightningModule):
         save_hyperparameters: bool = True,
         local_soft_prompt: str | None = None,
         init_text: str | None = None,
+        init_embedding_models: str | None = None,
+        init_embedding_mode: str,
     ) -> None:
         # Initialize the LightningModule
         super().__init__()
@@ -72,7 +74,26 @@ class BasicLM(L.LightningModule):
                     num_reps = math.ceil(prompt_length / len(init_ids))
                     init_ids = init_ids * num_reps
                 init_ids = init_ids[:prompt_length]
-                prompt_token_weights = self.model.get_input_embeddings()(torch.LongTensor(init_ids)).detach().clone()
+                if init_embedding_models and init_embedding_mode != "normal":
+                    init_embeddings = []
+                    for init_embedding_model in init_embedding_models.split(","):
+                        init_model = AutoModelForMaskedLM.from_pretrained(init_embedding_model)
+                        init_embeddings.append(init_model.get_input_embeddings())
+
+                    if init_embedding_mode == "average":
+                        prompt_token_weights = torch.mean(torch.stack([embedding(torch.LongTensor(init_ids)).detach().clone() for embedding in init_embeddings]), dim=0)
+                    elif init_embedding_mode == "mix":
+                        parts = len(init_embeddings)
+                        part_length = prompt_length // parts
+                        init_parts = []
+                        for part in range(parts-1):
+                            init_parts.append(init_ids[part * part_length : (part + 1) * part_length])
+                        init_parts.append(init_ids[(parts - 1) * part_length :])
+                        prompt_token_weights = torch.cat([embedding(torch.LongTensor(init_part)).detach().clone() for init_part, embedding in zip(init_parts, init_embeddings)], dim=0)
+                else:
+                    init_model = AutoModelForMaskedLM.from_pretrained(init_embedding_models.split(",")[0]) if init_embedding_models else self.model
+                    embedding = init_model.get_input_embeddings()
+                    prompt_token_weights = embedding(torch.LongTensor(init_ids)).detach().clone()
                 self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
 
         self.learning_rate = learning_rate
