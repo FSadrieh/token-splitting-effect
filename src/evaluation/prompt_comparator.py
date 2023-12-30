@@ -3,6 +3,7 @@ import torch
 
 from utils import create_init_text, create_soft_prompts
 
+
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("soft_prompt_names", type=str)
@@ -75,7 +76,7 @@ def main():
                 sim = f"\nEuclidean similarity: {sim_e_s}\nEuclidean distance: {sim_e_d}\nCosine similarity: {sim_c_s}"
             else:
                 sim = calculate_sim(soft_prompt_list[i], soft_prompt_list[j], args.distance_metric, args.pre_averaging)
-            similarity_dict[(soft_prompt_names[i], soft_prompt_names[j])] = round(sim,3)
+            similarity_dict[(soft_prompt_names[i], soft_prompt_names[j])] = round(sim, 3)
             similarity_dict[(soft_prompt_names[j], soft_prompt_names[i])] = "-"
 
     for i in range(len(soft_prompt_names)):

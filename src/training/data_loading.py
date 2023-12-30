@@ -77,7 +77,6 @@ class LMDataModule(L.LightningDataModule):
 
         # Initialize data collator for batching and padding
         data_collator = CustomDataCollator(self.tokenizer)
-        #data_collator = DefaultDataCollator()
 
         # Assign datasets and data collator for training and validation
         self.train_dataset = processed_datasets["train"]
@@ -96,7 +95,7 @@ class LMDataModule(L.LightningDataModule):
         data_files = {"train": self.train_file, "val": self.val_file}
 
         logger.info("Loading raw dataset...")
-        
+
         # Create temporary directory for dataset caching, if disk space conservation is enabled
         tmp_load_dataset_cache_dir = tempfile.mkdtemp(dir=tokenized_data_dir) if self.args.conserve_disk_space else None
         train_val_datasets = datasets.load_dataset(
@@ -179,19 +178,23 @@ class LMDataModule(L.LightningDataModule):
     def _get_dataset_cache_path(self, tokenizer_name: str):
         # Generate the path for cached dataset based on tokenizer and other parameters
         tokenizer_name = Path(self.tokenizer_path).as_posix().replace("/", "_")
-        
+
         # Create a tokenize function hash to ensure cache consistency
         # This is to prevent a rarely occurring bug where the hash of the tokenize function changes between runs
-        self.tokenize_function = self.tokenize_function if self.tokenize_function else make_tokenize_function(self.tokenizer, max_seq_length=self.max_length, data_dir=self.args.data_dir)
+        self.tokenize_function = (
+            self.tokenize_function
+            if self.tokenize_function
+            else make_tokenize_function(self.tokenizer, max_seq_length=self.max_length, data_dir=self.args.data_dir)
+        )
         tokenize_fn_hash = datasets.fingerprint.Hasher.hash(self.tokenize_function)
-        
+
         # Define the directory and file path for the cached data
         tokenized_data_dir = str(self.data_dir / "tokenized")
         cache_path = os.path.join(
             tokenized_data_dir,
             f"{self.args.train_file}.{self.args.val_file}.seq_len_{self.max_length}.tokenizer_{tokenizer_name}.tokenize_fn_hash_{tokenize_fn_hash}.arrow",
         )
-        
+
         # Check for existing cache files that might match
         maybe_cache_path = os.path.join(
             tokenized_data_dir,
@@ -218,17 +221,39 @@ def make_tokenize_function(tokenizer, max_seq_length, data_dir):
 
     # Define a tokenize function for processing text data
     def tokenize_function(examples):
-        tokenized =  tokenizer(
+        tokenized = tokenizer(
             examples["text"],
             max_length=max_seq_length,
             padding=True,
             truncation=True,
         )
-        
+
         if "emotion" in data_dir.name:
-            scalar_labels = torch.tensor([tokenizer("sadness", add_special_tokens=False)["input_ids"][0] if x == 0 else tokenizer("joy", add_special_tokens=False)["input_ids"][0] if x == 1 else tokenizer("love", add_special_tokens=False)["input_ids"][0] if x == 2 else tokenizer("anger", add_special_tokens=False)["input_ids"][0] if x == 3 else tokenizer("fear", add_special_tokens=False)["input_ids"][0] if x == 4 else tokenizer("surprise", add_special_tokens=False)["input_ids"][0] for x in examples["label"]])
+            scalar_labels = torch.tensor(
+                [
+                    tokenizer("sadness", add_special_tokens=False)["input_ids"][0]
+                    if x == 0
+                    else tokenizer("joy", add_special_tokens=False)["input_ids"][0]
+                    if x == 1
+                    else tokenizer("love", add_special_tokens=False)["input_ids"][0]
+                    if x == 2
+                    else tokenizer("anger", add_special_tokens=False)["input_ids"][0]
+                    if x == 3
+                    else tokenizer("fear", add_special_tokens=False)["input_ids"][0]
+                    if x == 4
+                    else tokenizer("surprise", add_special_tokens=False)["input_ids"][0]
+                    for x in examples["label"]
+                ]
+            )
         else:
-            scalar_labels = torch.tensor([tokenizer("negative", add_special_tokens=False)["input_ids"][0] if x == 0 else tokenizer("positive", add_special_tokens=False)["input_ids"][0] for x in examples["label"]])
+            scalar_labels = torch.tensor(
+                [
+                    tokenizer("negative", add_special_tokens=False)["input_ids"][0]
+                    if x == 0
+                    else tokenizer("positive", add_special_tokens=False)["input_ids"][0]
+                    for x in examples["label"]
+                ]
+            )
 
         tokenized["label"] = scalar_labels
         return tokenized

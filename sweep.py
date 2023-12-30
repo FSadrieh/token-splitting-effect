@@ -4,11 +4,13 @@ import argparse
 import train
 from cfgs.sweep_cfgs import sweep_cfgs
 
+
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--sweep-name", type=str, default="base_sweep")
     parser.add_argument("--count", type=int, default=10)
     return parser.parse_args()
+
 
 def main():
     args = arg_parser()
@@ -18,4 +20,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -36,12 +36,12 @@ class BasicLM(L.LightningModule):
         super().__init__()
         if save_hyperparameters:
             self.save_hyperparameters(ignore=["save_hyperparameters"])
-        
+
         self.models = []
         for model_name_or_path in model_names_or_paths:
             if model_name_or_path is None:
                 raise ValueError("model_name_or_path cannot be None")
-            
+
             # Load configuration and initialize the first transformer model
             config = AutoConfig.from_pretrained(model_name_or_path, return_dict=True)
             model: PreTrainedModel = (
@@ -49,10 +49,10 @@ class BasicLM(L.LightningModule):
                 if not from_scratch
                 else AutoModelForMaskedLM.from_config(config=config)
             )
-            
+
             for param in model.parameters():
                 param.requires_grad = False
-            
+
             self.models.append(model)
 
         self.model = self.models[0]
@@ -81,17 +81,32 @@ class BasicLM(L.LightningModule):
                         init_embeddings.append(init_model.get_input_embeddings())
 
                     if init_embedding_mode == "average":
-                        prompt_token_weights = torch.mean(torch.stack([embedding(torch.LongTensor(init_ids)).detach().clone() for embedding in init_embeddings]), dim=0)
+                        prompt_token_weights = torch.mean(
+                            torch.stack(
+                                [embedding(torch.LongTensor(init_ids)).detach().clone() for embedding in init_embeddings]
+                            ),
+                            dim=0,
+                        )
                     elif init_embedding_mode == "mix":
                         parts = len(init_embeddings)
                         part_length = prompt_length // parts
                         init_parts = []
-                        for part in range(parts-1):
+                        for part in range(parts - 1):
                             init_parts.append(init_ids[part * part_length : (part + 1) * part_length])
                         init_parts.append(init_ids[(parts - 1) * part_length :])
-                        prompt_token_weights = torch.cat([embedding(torch.LongTensor(init_part)).detach().clone() for init_part, embedding in zip(init_parts, init_embeddings)], dim=0)
+                        prompt_token_weights = torch.cat(
+                            [
+                                embedding(torch.LongTensor(init_part)).detach().clone()
+                                for init_part, embedding in zip(init_parts, init_embeddings)
+                            ],
+                            dim=0,
+                        )
                 else:
-                    init_model = AutoModelForMaskedLM.from_pretrained(init_embedding_models.split(",")[0]) if init_embedding_models else self.model
+                    init_model = (
+                        AutoModelForMaskedLM.from_pretrained(init_embedding_models.split(",")[0])
+                        if init_embedding_models
+                        else self.model
+                    )
                     embedding = init_model.get_input_embeddings()
                     prompt_token_weights = embedding(torch.LongTensor(init_ids)).detach().clone()
                 self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
@@ -105,24 +120,23 @@ class BasicLM(L.LightningModule):
         self.epsilon = epsilon
         self.tokenizer = tokenizer
 
-
     def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
         prompt = self.soft_prompt(self.prompt_tokens.to(self.device)).unsqueeze(0).expand(input_ids.shape[0], -1, -1)
-        
+
         # Adjust attention mask for the concatenated prompt
         attention_mask = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device), attention_mask], dim=1)
         labels = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device) * -100, labels], dim=1).long()
-        
+
         outputs = []
         for model in self.models:
             model.to(self.device)
             embedded_input = model.get_input_embeddings()(input_ids)
-        
+
             # Generate prompt embeddings and concatenate with input embeddings
             inputs_embeds = torch.cat([prompt, embedded_input], dim=1)
-            
+
             outputs.append(model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels))
-        
+
         return outputs
 
     def training_step(self, batch, batch_idx):
@@ -191,7 +205,12 @@ class BasicLM(L.LightningModule):
                 scheduler_name,
                 optimizer,
                 num_warmup_steps=int(self.warmup_period),
-                num_training_steps=self.trainer.max_steps if self.trainer.max_steps != -1 else int(int(len(self.trainer.train_dataloader) / int(self.trainer.accumulate_grad_batches)) * self.trainer.max_epochs),
+                num_training_steps=self.trainer.max_steps
+                if self.trainer.max_steps != -1
+                else int(
+                    int(len(self.trainer.train_dataloader) / int(self.trainer.accumulate_grad_batches))
+                    * self.trainer.max_epochs
+                ),
             )
             scheduler_config = {"frequency": 1}
 

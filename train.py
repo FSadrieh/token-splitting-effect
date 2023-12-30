@@ -26,7 +26,7 @@ WANDB_PROJECT = "explainable-soft-prompts"
 WANDB_ENTITY = "raphael-team"
 
 
-def main(is_sweep = None):
+def main(is_sweep=None):
     # Checking CUDA device availability and setup
     # "Rank" is the ID of the process in a distributed SLURM evironment, Rank 0 is main process
     args = parse(TrainingArgs, add_config_path_arg=True)
@@ -55,12 +55,12 @@ def main(is_sweep = None):
     if args.offline or args.fast_dev_run or args.data_preprocessing_only:
         os.environ["WANDB_MODE"] = "dryrun"
     wandb_extra_args = dict(name=args.run_name)
-    
+
     # Resume training from W&B checkpoint if necessary
     if args.saved_checkpoint_path and args.resume and check_checkpoint_path_for_wandb(args.saved_checkpoint_path):
         logger.info("Resuming training from W&B")
-        wandb_extra_args = dict(id=check_checkpoint_path_for_wandb(args.saved_checkpoint_path), resume="must") # resume W&B run
-    
+        wandb_extra_args = dict(id=check_checkpoint_path_for_wandb(args.saved_checkpoint_path), resume="must")  # resume W&B run
+
     # Initializing the W&B logger with project and entity details
     wandb_logger = WandbLogger(
         project=WANDB_PROJECT,
@@ -91,7 +91,9 @@ def main(is_sweep = None):
 
     ################# Construct model ##############
 
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(args.tokenizer_path or args.hf_model_names[0], use_fast=True)
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(
+        args.tokenizer_path or args.hf_model_names[0], use_fast=True
+    )
     # Resume from checkpoint if specified
     model_args = dict(
         model_names_or_paths=args.hf_model_names,

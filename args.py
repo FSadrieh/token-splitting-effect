@@ -14,7 +14,7 @@ class TrainingArgs:
     """
 
     data_dir: Path = field(alias="-d", default="data/imdb")
-    
+
     hf_model_names: list[str] = list_field(default=["google/multiberts-seed_0"], alias="--models")
     "HuggingFace model identifier. This is used to construct the model architecture and load pretrained weights if not specified otherwise."
 
