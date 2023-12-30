@@ -13,7 +13,7 @@ from print_on_steroids import logger
 from torch.utils.data.dataloader import DataLoader
 from transformers import PreTrainedTokenizerFast
 
-from training.custom_data_collator import CustomDataCollator
+from src.training.custom_data_collator import CustomDataCollator
 
 from dlib.frameworks.pytorch import get_rank
 

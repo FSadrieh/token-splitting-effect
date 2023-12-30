@@ -14,22 +14,26 @@ from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, log_slurm_info, wait_for_debugger
-from training.data_loading import LMDataModule
-from training.helpers import (
+from src.training.data_loading import LMDataModule
+from src.training.helpers import (
     ProgressMetricCallback,
     check_checkpoint_path_for_wandb,
     check_for_wandb_checkpoint_and_download_if_necessary,
 )
-from training.model import BasicLM
+from src.training.model import BasicLM
 
 WANDB_PROJECT = "explainable-soft-prompts"
 WANDB_ENTITY = "raphael-team"
 
 
-def main(args: TrainingArgs):
+def main(is_sweep = None):
     # Checking CUDA device availability and setup
     # "Rank" is the ID of the process in a distributed SLURM evironment, Rank 0 is main process
+    args = parse(TrainingArgs, add_config_path_arg=True)
     current_process_rank = get_rank()
+    if is_sweep:
+        wandb.init()
+        args.update_from_dict(wandb.config)
     logger.config(rank=current_process_rank, print_rank0_only=True)
     if args.accelerator == "cuda":
         num_available_gpus = torch.cuda.device_count()
@@ -223,7 +227,6 @@ def main(args: TrainingArgs):
 
 
 if __name__ == "__main__":
-    parsed_arg_groups = parse(TrainingArgs, add_config_path_arg=True)
     current_process_rank = get_rank()
     with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
-        main(parsed_arg_groups)
+        main()
