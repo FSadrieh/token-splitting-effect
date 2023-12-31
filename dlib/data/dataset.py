@@ -16,7 +16,6 @@ def load_datasets(
     sanity_tokenizer: Path | None = None,
     use_clipped_val: bool = False,
 ):
-
     with open(data_dir / "metadata.json", "r") as f:
         metadata = json.load(f)
 

@@ -15,7 +15,7 @@ def arg_parser():
         "-d", "--distance_metric", type=str, default="euclidean", help="Supports: euclidean_sim, euclidean, cosine, all"
     )
     parser.add_argument("-e", "--embedding_size", type=str, default=768)
-    parser.add_argument("-p", "--prompt_length", type=str, default=30)
+    parser.add_argument("-p", "--prompt_length", type=str, default=16)
 
     return parser.parse_args()
 

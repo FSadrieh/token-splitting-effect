@@ -120,6 +120,8 @@ class BasicLM(L.LightningModule):
         self.epsilon = epsilon
         self.tokenizer = tokenizer
 
+        self.init_soft_prompt = self.soft_prompt(self.prompt_tokens).detach().clone()
+
     def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
         prompt = self.soft_prompt(self.prompt_tokens.to(self.device)).unsqueeze(0).expand(input_ids.shape[0], -1, -1)
 
@@ -151,6 +153,10 @@ class BasicLM(L.LightningModule):
         outputs = self(**batch)
         loss = torch.stack([output.loss for output in outputs]).mean()
         self.log("val/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        distance = torch.nn.functional.pairwise_distance(
+            self.init_soft_prompt.to(self.device), self.soft_prompt(self.prompt_tokens.to(self.device)), p=2
+        )
+        self.log("val/distance_to_init", torch.mean(distance).item(), on_step=False, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):
         # Configure the optimizers and learning rate schedulers

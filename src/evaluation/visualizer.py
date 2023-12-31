@@ -26,7 +26,7 @@ def arg_parser():
     )
     parser.add_argument("-a", "--average", action="store_true", default=False)
     parser.add_argument("-e", "--embedding_size", type=str, default=768)
-    parser.add_argument("-p", "--prompt_length", type=str, default=30)
+    parser.add_argument("-p", "--prompt_length", type=str, default=16)
     return parser.parse_args()
 
 
