@@ -6,7 +6,7 @@ from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from matplotlib import pyplot as plt
 
-from utils import create_soft_prompts, create_init_texts, average
+from utils import create_soft_prompts, create_init_texts, average, get_model_names_from_numbers
 
 DEFAULT_COLORS = ["blue", "orange", "green", "red", "purple", "brown", "pink", "gray", "olive", "cyan", "black"]
 
@@ -14,7 +14,7 @@ DEFAULT_COLORS = ["blue", "orange", "green", "red", "purple", "brown", "pink", "
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("soft_prompt_names", type=str)
-    parser.add_argument("models", type=str)
+    parser.add_argument("model_numbers", type=str)
     parser.add_argument("output_path", type=str)
     parser.add_argument("-i", "--init_texts", type=str, default=None)
     parser.add_argument(
@@ -25,8 +25,8 @@ def arg_parser():
         help="Comma separated list of models to use for init text. If not specified the models for the embeddings will be used",
     )
     parser.add_argument("-a", "--average", action="store_true", default=False)
-    parser.add_argument("-e", "--embedding_size", type=str, default=768)
-    parser.add_argument("-p", "--prompt_length", type=str, default=16)
+    parser.add_argument("-e", "--embedding_size", type=int, default=768)
+    parser.add_argument("-p", "--prompt_length", type=int, default=16)
     return parser.parse_args()
 
 
@@ -114,22 +114,48 @@ def prepare_init_texts(
 
 def main():
     args = arg_parser()
+    soft_prompt_names = args.soft_prompt_names.split(",")
+    model_names = get_model_names_from_numbers(args.model_numbers.split(","))
+    visualize(
+        soft_prompt_names,
+        model_names,
+        args.output_path,
+        args.init_texts,
+        args.init_text_models,
+        args.average,
+        args.embedding_size,
+        args.prompt_length,
+    )
 
+
+def visualize(
+    soft_prompt_names: list,
+    model_names: list,
+    output_path: str,
+    init_texts: str,
+    init_text_models: str,
+    avg: bool,
+    embedding_size: int,
+    prompt_length: int,
+):
+    print(
+        f"Visualizing soft prompts: {soft_prompt_names} and init text: {init_texts}, on the models {model_names}. Pre averaging is {avg}. Saving to {output_path}."
+    )
     soft_prompts, soft_prompt_names, prompt_length = prepare_soft_prompts(
-        args.soft_prompt_names.split(","), args.prompt_length, args.embedding_size, args.average
+        soft_prompt_names.split(","), prompt_length, embedding_size, average
     )
-    init_models = args.init_text_models.split(",") if args.init_text_models else args.models.split(",")
+    init_models = init_text_models.split(",") if init_text_models else model_names.split(",")
     soft_prompts, soft_prompt_names = prepare_init_texts(
-        args.init_texts, init_models, args.prompt_length, args.embedding_size, args.average, soft_prompts, soft_prompt_names
+        init_texts, init_models, prompt_length, embedding_size, average, soft_prompts, soft_prompt_names
     )
 
-    embeddings, model_names = get_model_embedding_spaces(args.models.split(","))
+    embeddings, model_names = get_model_embedding_spaces(model_names.split(","))
     embedding_space = torch.cat([embeddings, soft_prompts], dim=0).detach().numpy()
 
     reduced_embedding_space = reduce_embedding_space(embedding_space)
     plot_embedding_space(
         reduced_embedding_space,
-        output_path=args.output_path,
+        output_path=output_path,
         embedding_space_size=embeddings.shape[0] // len(model_names),
         prompt_length=prompt_length,
         prompts=soft_prompt_names,

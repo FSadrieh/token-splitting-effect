@@ -55,3 +55,10 @@ def average(soft_prompt_list: list, average: bool) -> (torch.Tensor, int):
     if average:
         return torch.cat([torch.mean(soft_prompt, dim=0) for soft_prompt in soft_prompt_list], dim=0), 1
     return torch.cat(soft_prompt_list, dim=0), soft_prompt_list[0].shape[0]
+
+
+def get_model_names_from_numbers(model_numbers: list) -> list:
+    model_names = []
+    for model_number in model_numbers:
+        model_names.append(f"google/multiberts-seed_{model_number}")
+    return model_names
