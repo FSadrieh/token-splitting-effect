@@ -109,6 +109,7 @@ def main(is_sweep=None):
         init_text=args.init_text,
         init_embedding_models=args.init_embedding_models,
         init_embedding_mode=args.init_embedding_mode,
+        init_seed=args.init_seed,
     )
     if args.saved_checkpoint_path:
         args.saved_checkpoint_path = check_for_wandb_checkpoint_and_download_if_necessary(

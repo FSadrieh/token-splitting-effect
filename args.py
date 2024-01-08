@@ -39,13 +39,13 @@ class TrainingArgs:
     ##### Training constants ######
     ###############################
 
-    training_goal: int = field(default=10)
+    training_goal: int = field(default=5)
     "Number of epochs to run."
 
     save_interval: int | float = field(default=0.1)
     "Interval between model checkpoints. If < 1, use as percentage of training_goal."
 
-    warmup_period: float = field(default=0.005)
+    warmup_period: float = field(default=0.03951068869784255)
     "Length of lr warmup. If < 1, use as percentage of training_goal."
 
     lr_decay_period: int = field(default=-1)
@@ -59,9 +59,9 @@ class TrainingArgs:
 
     learning_rate: float = field(default=3e-4)
     batch_size: int = field(default=256, alias="-b")
-    weight_decay: float = 0.1
-    beta1: float = 0.9
-    beta2: float = 0.95
+    weight_decay: float = 0.17270324640937235
+    beta1: float = 0.8034042221205476
+    beta2: float = 0.9388980921327073
     grad_clip: float = field(default=1.0)
     "If -1, disable."
 
@@ -151,6 +151,9 @@ class TrainingArgs:
 
     init_embedding_mode: Literal["normal", "average", "mix"] = field(default="normal")
     "Will only be used if init_embedding_models is used. Normal will use the first model, average will average the embeddings of all models, mix will cut the embeddings into equal parts and embedd each part with a different model."
+
+    init_seed: int = field(default=0)
+    "Seed to be used for soft prompt initialization. Will only be used if no init text is specified."
 
     def __post_init__(self):
         assert self.num_devices > 0

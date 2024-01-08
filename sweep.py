@@ -7,7 +7,7 @@ from cfgs.sweep_cfgs import sweep_cfgs
 
 def arg_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sweep-name", type=str, default="base_sweep")
+    parser.add_argument("--sweep-name", type=str, default="extreme_lr_sweep")
     parser.add_argument("--count", type=int, default=10)
     return parser.parse_args()
 

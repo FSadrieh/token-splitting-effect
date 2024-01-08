@@ -27,6 +27,7 @@ class BasicLM(L.LightningModule):
         prompt_length: int,
         init_embedding_mode: str,
         epsilon: float = 1e-8,
+        init_seed: int = 42,
         save_hyperparameters: bool = True,
         local_soft_prompt: str | None = None,
         init_text: str | None = None,
@@ -110,6 +111,11 @@ class BasicLM(L.LightningModule):
                     embedding = init_model.get_input_embeddings()
                     prompt_token_weights = embedding(torch.LongTensor(init_ids)).detach().clone()
                 self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
+
+            else:
+                seed = torch.random.get_rng_state()
+                self.soft_prompt.weight = torch.nn.Parameter(torch.rand(prompt_length, embedding_size, generator=torch.random.manual_seed(init_seed)).to(torch.float32))
+                torch.random.set_rng_state(seed)
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
