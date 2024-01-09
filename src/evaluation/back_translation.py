@@ -3,13 +3,16 @@ import torch
 from transformers.models.auto.modeling_auto import AutoModelForMaskedLM
 from transformers import AutoTokenizer
 
-from utils import create_soft_prompt, get_model_names_from_numbers
+from utils import create_soft_prompt, get_model_names_from_numbers, load_init_text
 
 
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("soft_prompt_name", type=str)
     parser.add_argument("model_number", type=str)
+    parser.add_argument(
+        "-i", "--initial_prompt", action="store_true", help="Back translate the initial prompt instead of the trained one."
+    )
     parser.add_argument("-d", "--distance_metric", type=str, default="euclidean", help="Supports: euclidean, cosine")
     parser.add_argument("-e", "--embedding_size", type=int, default=768)
     parser.add_argument("-p", "--prompt_length", type=int, default=16)
@@ -20,12 +23,27 @@ def arg_parser():
 def main():
     args = arg_parser()
     model_name = get_model_names_from_numbers([args.model_number])[0]
-    back_translation(args.soft_prompt_name, model_name, args.distance_metric, args.embedding_size, args.prompt_length)
+    back_translation(
+        args.soft_prompt_name, model_name, args.distance_metric, args.embedding_size, args.prompt_length, args.initial_prompt
+    )
 
 
-def back_translation(soft_prompt_name: str, model_name: str, distance_metric: str, embedding_size: int, prompt_length: int):
-    print(f"Back translation for {soft_prompt_name} on {model_name}, with the distance metric {distance_metric}.")
-    soft_prompt = create_soft_prompt(soft_prompt_name, prompt_length, embedding_size)
+def back_translation(
+    soft_prompt_name: str,
+    model_name: str,
+    distance_metric: str,
+    embedding_size: int,
+    prompt_length: int,
+    use_initial_prompt: bool,
+):
+    if use_initial_prompt:
+        print(
+            f"Back translation for the initial prompt of {soft_prompt_name} on {model_name}, with the distance metric {distance_metric}."
+        )
+        soft_prompt, __ = load_init_text(soft_prompt_name)
+    else:
+        print(f"Back translation for {soft_prompt_name} on {model_name}, with the distance metric {distance_metric}.")
+        soft_prompt = create_soft_prompt(soft_prompt_name, prompt_length, embedding_size)
 
     model = AutoModelForMaskedLM.from_pretrained(model_name)
     embeddings = model.get_input_embeddings().weight

@@ -29,7 +29,7 @@ WANDB_ENTITY = "raphael-team"
 def main(is_sweep=None, config_path=None):
     # Checking CUDA device availability and setup
     # "Rank" is the ID of the process in a distributed SLURM evironment, Rank 0 is main process
-    
+
     current_process_rank = get_rank()
     if is_sweep:
         wandb.init()
@@ -231,7 +231,9 @@ def main(is_sweep=None, config_path=None):
             wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
 
             logger.success("Saving finished!")
-            logger.info(f"The soft prompt can be found at: {save_dir / 'soft_prompt.pt'}. Specify {save_dir.split('/')[-2]} in the evaluation scripts, to load the soft prompt.")
+            logger.info(
+                f"The soft prompt can be found at: {save_dir / 'soft_prompt.pt'}. Specify {str(save_dir).split('/')[-2]} in the evaluation scripts, to load the soft prompt."
+            )
 
 
 if __name__ == "__main__":

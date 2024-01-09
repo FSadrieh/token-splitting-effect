@@ -2,7 +2,7 @@ import argparse
 import torch
 import csv
 
-from utils import create_init_text, create_soft_prompts, get_model_names_from_numbers
+from utils import create_init_text, create_soft_prompts, get_model_names_from_numbers, load_init_text
 
 
 def arg_parser():
@@ -52,9 +52,7 @@ def calculate_sim(soft_prompt_1: torch.Tensor, soft_prompt_2: torch.Tensor, dist
 def main():
     args = arg_parser()
     soft_prompt_names = args.soft_prompt_names.split(",")
-    tokenizer_names = (
-        get_model_names_from_numbers(args.model_numbers.split(",")) if args.model_numbers is not None else None
-    )
+    tokenizer_names = get_model_names_from_numbers(args.model_numbers.split(",")) if args.model_numbers is not None else None
     compare(
         soft_prompt_names,
         tokenizer_names,
@@ -84,11 +82,16 @@ def compare(
 
     # Creates the initial soft prompt if specified
     if init_text is not None:
-        if tokenizer_names is None:
-            raise ValueError("You need to specify a tokenizer if you want to use an init text")
-        for tokenizer in tokenizer_names:
-            soft_prompt_list.append(create_init_text(init_text, tokenizer, embedding_size, prompt_length))
-            soft_prompt_names.append(f"init_{tokenizer.split('/')[-1]}")
+        if init_text == "default":
+            init_text, init_name = load_init_text(soft_prompt_names[0])
+            soft_prompt_list.append(init_text)
+            soft_prompt_names.append(init_name)
+        else:
+            if tokenizer_names is None:
+                raise ValueError("You need to specify a tokenizer if you want to use an init text")
+            for tokenizer in tokenizer_names:
+                soft_prompt_list.append(create_init_text(init_text, tokenizer, embedding_size, prompt_length))
+                soft_prompt_names.append(f"init_{tokenizer.split('/')[-1]}")
 
     # If there is only one soft prompt, there is nothing to compare. (At this stage the init text is already added to the list)
     if len(soft_prompt_names) < 2:
@@ -116,7 +119,10 @@ def compare(
         writer = csv.writer(f)
         writer.writerow([""] + soft_prompt_names)
         for i in range(len(soft_prompt_names)):
-            writer.writerow([soft_prompt_names[i]] + [similarity_dict[(soft_prompt_names[i], soft_prompt_names[j])] for j in range(len(soft_prompt_names))])
+            writer.writerow(
+                [soft_prompt_names[i]]
+                + [similarity_dict[(soft_prompt_names[i], soft_prompt_names[j])] for j in range(len(soft_prompt_names))]
+            )
 
 
 if __name__ == "__main__":

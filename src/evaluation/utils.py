@@ -35,9 +35,10 @@ def create_init_texts(init_texts: list, model_names: list, prompt_length: int, e
             init_texts_names.append(f"{' '.join(init_text.split(' ')[:3])}_{model_name}")
     return init_texts_list, init_texts_names
 
+
 def load_init_text(soft_prompt_name: str) -> (list, list):
     init_text_path = f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/init_soft_prompt.pt"
-    init_text = (torch.load(init_text_path))
+    init_text = torch.load(init_text_path)
     init_texts_name = f"init text of {soft_prompt_name}"
     return init_text, init_texts_name
 
