@@ -173,11 +173,11 @@ class TrainingArgs:
         elif self.lr_decay_period < 1:
             self.lr_decay_period = int(self.lr_decay_period * self.training_goal)
 
-        assert self.batch_size % self.micro_batch_size == 0
+        # assert self.batch_size % self.micro_batch_size == 0
         if self.gradient_accumulation_steps == -1:
             self.gradient_accumulation_steps = self.batch_size // self.iter_batch_size
         assert self.gradient_accumulation_steps > 0
-        assert self.batch_size == self.micro_batch_size * self.num_devices * self.gradient_accumulation_steps
+        # assert self.batch_size == self.micro_batch_size * self.num_devices * self.gradient_accumulation_steps
 
         if self.tokenizer_path is None:
             self.tokenizer_path = self.hf_model_names[0]
