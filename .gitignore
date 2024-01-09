@@ -1,5 +1,6 @@
 data/*
 visualizations/*
+similarities/*
 cfgs/*
 checkpoints/*
 !data/mock/

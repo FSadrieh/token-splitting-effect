@@ -231,6 +231,7 @@ def main(is_sweep=None, config_path=None):
             wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
 
             logger.success("Saving finished!")
+            logger.info(f"The soft prompt can be found at: {save_dir / 'soft_prompt.pt'}. Specify {save_dir.split('/')[-2]} in the evaluation scripts, to load the soft prompt.")
 
 
 if __name__ == "__main__":

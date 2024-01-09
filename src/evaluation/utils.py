@@ -3,7 +3,7 @@ import torch
 
 def create_init_text(init_text: str, model_name: str, embedding_size: int, prompt_length: int) -> torch.Tensor:
     """
-    This function mirrors the code in src/model.py to get the init text, to see how much the soft prompt changed
+    This function mirrors the code in src/model.py to get the init text, to see how much the soft prompt changed. This is for legacy runs, where the init text was not saved.
     """
     from transformers import AutoTokenizer
     import math
@@ -55,12 +55,6 @@ def create_soft_prompts(soft_prompt_names: list, prompt_length: int, embedding_s
     for soft_prompt_name in soft_prompt_names:
         soft_prompt_list.append(create_soft_prompt(soft_prompt_name, prompt_length, embedding_size))
     return soft_prompt_list
-
-
-def average(soft_prompt_list: list, average: bool) -> (torch.Tensor, int):
-    if average:
-        return torch.cat([torch.mean(soft_prompt, dim=0) for soft_prompt in soft_prompt_list], dim=0), 1
-    return torch.cat(soft_prompt_list, dim=0), soft_prompt_list[0].shape[0]
 
 
 def get_model_names_from_numbers(model_numbers: list) -> list:

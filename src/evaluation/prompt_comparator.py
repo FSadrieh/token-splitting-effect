@@ -1,5 +1,6 @@
 import argparse
 import torch
+import csv
 
 from utils import create_init_text, create_soft_prompts, get_model_names_from_numbers
 
@@ -7,9 +8,10 @@ from utils import create_init_text, create_soft_prompts, get_model_names_from_nu
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("soft_prompt_names", type=str)
+    parser.add_argument("output_path", type=str)
     parser.add_argument("-i", "--init_text", type=str, default=None)
     # Note it does not make a lot of sense to use the init text with soft prompts trained on other models, since the init text would be different
-    parser.add_argument("-t", "--tokenizer_numbers", type=str, default=None)
+    parser.add_argument("-m", "--model_numbers", type=str, default=None)
     parser.add_argument("-pa", "--pre_averaging", type=bool, default=False)
     parser.add_argument(
         "-d", "--distance_metric", type=str, default="euclidean", help="Supports: euclidean_sim, euclidean, cosine, all"
@@ -51,7 +53,7 @@ def main():
     args = arg_parser()
     soft_prompt_names = args.soft_prompt_names.split(",")
     tokenizer_names = (
-        get_model_names_from_numbers(args.tokenizer_numbers.split(",")) if args.tokenizer_numbers is not None else None
+        get_model_names_from_numbers(args.model_numbers.split(",")) if args.model_numbers is not None else None
     )
     compare(
         soft_prompt_names,
@@ -61,6 +63,7 @@ def main():
         args.distance_metric,
         args.embedding_size,
         args.prompt_length,
+        args.output_path,
     )
 
 
@@ -72,6 +75,7 @@ def compare(
     distance_metric: str,
     embedding_size: int,
     prompt_length: int,
+    output_path: str,
 ):
     print(
         f"Comparing soft prompts: {soft_prompt_names} and init text: {init_text}, with the distance metric {distance_metric}, on the models {tokenizer_names}. Pre averaging is {pre_averaging}"
@@ -103,14 +107,16 @@ def compare(
             else:
                 sim = calculate_sim(soft_prompt_list[i], soft_prompt_list[j], distance_metric, pre_averaging)
             similarity_dict[(soft_prompt_names[i], soft_prompt_names[j])] = round(sim, 3)
-            similarity_dict[(soft_prompt_names[j], soft_prompt_names[i])] = "-"
+            similarity_dict[(soft_prompt_names[j], soft_prompt_names[i])] = round(sim, 3)
 
     for i in range(len(soft_prompt_names)):
         similarity_dict[(soft_prompt_names[i], soft_prompt_names[i])] = 0.0 if distance_metric == "euclidean" else 1.0
-    print("\t".join(soft_prompt_names))
-    for row_prompt in soft_prompt_names:
-        row_values = [row_prompt] + [similarity_dict[(row_prompt, col_prompt)] for col_prompt in soft_prompt_names]
-        print("\t".join(map(str, row_values)))
+
+    with open(f"similarities/{output_path}", "w+") as f:
+        writer = csv.writer(f)
+        writer.writerow([""] + soft_prompt_names)
+        for i in range(len(soft_prompt_names)):
+            writer.writerow([soft_prompt_names[i]] + [similarity_dict[(soft_prompt_names[i], soft_prompt_names[j])] for j in range(len(soft_prompt_names))])
 
 
 if __name__ == "__main__":
