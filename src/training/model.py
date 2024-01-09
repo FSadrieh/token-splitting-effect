@@ -114,7 +114,9 @@ class BasicLM(L.LightningModule):
 
             else:
                 seed = torch.random.get_rng_state()
-                self.soft_prompt.weight = torch.nn.Parameter(torch.rand(prompt_length, embedding_size, generator=torch.random.manual_seed(init_seed)).to(torch.float32))
+                self.soft_prompt.weight = torch.nn.Parameter(
+                    torch.rand(prompt_length, embedding_size, generator=torch.random.manual_seed(init_seed)).to(torch.float32)
+                )
                 torch.random.set_rng_state(seed)
 
         self.learning_rate = learning_rate

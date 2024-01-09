@@ -27,13 +27,19 @@ def create_init_text(init_text: str, model_name: str, embedding_size: int, promp
 
 
 def create_init_texts(init_texts: list, model_names: list, prompt_length: int, embedding_size: int) -> (list, list):
-    init_text_list = []
+    init_texts_list = []
     init_texts_names = []
     for init_text in init_texts:
         for model_name in model_names:
-            init_text_list.append(create_init_text(init_text, model_name, embedding_size, prompt_length))
+            init_texts_list.append(create_init_text(init_text, model_name, embedding_size, prompt_length))
             init_texts_names.append(f"{' '.join(init_text.split(' ')[:3])}_{model_name}")
-    return init_text_list, init_texts_names
+    return init_texts_list, init_texts_names
+
+def load_init_text(soft_prompt_name: str) -> (list, list):
+    init_text_path = f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/init_soft_prompt.pt"
+    init_text = (torch.load(init_text_path))
+    init_texts_name = f"init text of {soft_prompt_name}"
+    return init_text, init_texts_name
 
 
 def create_soft_prompt(soft_prompt_name: str, prompt_length: int, embedding_size: int) -> torch.Tensor:
@@ -55,3 +61,10 @@ def average(soft_prompt_list: list, average: bool) -> (torch.Tensor, int):
     if average:
         return torch.cat([torch.mean(soft_prompt, dim=0) for soft_prompt in soft_prompt_list], dim=0), 1
     return torch.cat(soft_prompt_list, dim=0), soft_prompt_list[0].shape[0]
+
+
+def get_model_names_from_numbers(model_numbers: list) -> list:
+    model_names = []
+    for model_number in model_numbers:
+        model_names.append(f"google/multiberts-seed_{model_number}")
+    return model_names

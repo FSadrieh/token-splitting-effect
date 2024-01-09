@@ -57,8 +57,8 @@ class TrainingArgs:
     block_size: int = field(default=512)
     "The sequence length of samples."
 
-    learning_rate: float = field(default=3e-4)
-    batch_size: int = field(default=256, alias="-b")
+    learning_rate: float = field(default=0.8111074872795443)
+    batch_size: int = field(default=160, alias="-b")
     weight_decay: float = 0.17270324640937235
     beta1: float = 0.8034042221205476
     beta2: float = 0.9388980921327073
@@ -143,7 +143,7 @@ class TrainingArgs:
     prompt_length: int = field(default=16)
     "Length of soft prompt to be trained."
 
-    init_text: str = field(default="Classify the sentiment of this movie review with 'positive' or 'negative':")
+    init_text: str = field(default=None)#"Classify the sentiment of this movie review with 'positive' or 'negative':")
     "Initial text to be used for soft prompt initialization."
 
     init_embedding_models: str = field(default=None)
