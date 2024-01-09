@@ -9,7 +9,7 @@ from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from lightning.pytorch.plugins.environments import LightningEnvironment, SLURMEnvironment
 from print_on_steroids import graceful_exceptions, logger
-from simple_parsing import parse
+from simple_parsing import parse, parse_known_args
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 from args import TrainingArgs
@@ -26,14 +26,17 @@ WANDB_PROJECT = "explainable-soft-prompts"
 WANDB_ENTITY = "raphael-team"
 
 
-def main(is_sweep=None):
+def main(is_sweep=None, config_path=None):
     # Checking CUDA device availability and setup
     # "Rank" is the ID of the process in a distributed SLURM evironment, Rank 0 is main process
-    args = parse(TrainingArgs, add_config_path_arg=True)
+    
     current_process_rank = get_rank()
     if is_sweep:
         wandb.init()
+        args, __ = parse_known_args(TrainingArgs, config_path=config_path)
         args.update_from_dict(wandb.config)
+    else:
+        args = parse(TrainingArgs, add_config_path_arg=True)
     logger.config(rank=current_process_rank, print_rank0_only=True)
     if args.accelerator == "cuda":
         num_available_gpus = torch.cuda.device_count()

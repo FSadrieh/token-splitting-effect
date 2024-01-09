@@ -15,7 +15,7 @@ class TrainingArgs:
 
     data_dir: Path = field(alias="-d", default="data/imdb")
 
-    hf_model_names: list[str] = list_field(default=["google/multiberts-seed_0"], alias="--models")
+    hf_model_names: list[str] = list_field(alias="--models")
     "HuggingFace model identifier. This is used to construct the model architecture and load pretrained weights if not specified otherwise."
 
     from_scratch: bool = field(default=False)
@@ -45,7 +45,7 @@ class TrainingArgs:
     save_interval: int | float = field(default=0.1)
     "Interval between model checkpoints. If < 1, use as percentage of training_goal."
 
-    warmup_period: float = field(default=0.03951068869784255)
+    warmup_period: float = field(default=0.005)
     "Length of lr warmup. If < 1, use as percentage of training_goal."
 
     lr_decay_period: int = field(default=-1)
@@ -57,11 +57,11 @@ class TrainingArgs:
     block_size: int = field(default=512)
     "The sequence length of samples."
 
-    learning_rate: float = field(default=0.8111074872795443)
+    learning_rate: float = field(default=3e-4)
     batch_size: int = field(default=160, alias="-b")
-    weight_decay: float = 0.17270324640937235
-    beta1: float = 0.8034042221205476
-    beta2: float = 0.9388980921327073
+    weight_decay: float = 0.1
+    beta1: float = 0.9
+    beta2: float = 0.95
     grad_clip: float = field(default=1.0)
     "If -1, disable."
 
@@ -143,7 +143,7 @@ class TrainingArgs:
     prompt_length: int = field(default=16)
     "Length of soft prompt to be trained."
 
-    init_text: str = field(default=None)#"Classify the sentiment of this movie review with 'positive' or 'negative':")
+    init_text: str = field(default=None)
     "Initial text to be used for soft prompt initialization."
 
     init_embedding_models: str = field(default=None)
