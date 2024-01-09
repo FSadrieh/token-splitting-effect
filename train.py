@@ -217,6 +217,7 @@ def main(is_sweep=None):
             save_dir = Path(checkpoint_callback.dirpath)
             os.makedirs(save_dir, exist_ok=True)
             torch.save(model.soft_prompt.state_dict(), save_dir / "soft_prompt.pt")
+            torch.save(model.init_soft_prompt, save_dir / "init_soft_prompt.pt")
 
             logger.info("Collecting PL checkpoint for wandb...")
             artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")
