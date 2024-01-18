@@ -41,6 +41,7 @@ def get_model_embedding_spaces(models: list) -> (torch.Tensor, list):
 
 
 def reduce_embedding_space(embedding_space: torch.Tensor, n_components: int = 50) -> torch.Tensor:
+    print(f"Reducing embedding space to {n_components} dimensions.")
     pca = PCA(n_components=n_components)
     reduced_embedding_space = pca.fit_transform(embedding_space)
 

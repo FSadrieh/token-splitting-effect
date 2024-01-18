@@ -10,6 +10,12 @@ from transformers.models.auto.modeling_auto import AutoModelForMaskedLM
 from transformers.optimization import get_scheduler
 from warmup_scheduler import GradualWarmupScheduler
 
+import sys
+from os import path
+
+sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
+from similarity_calculation import calculate_sim  # noqa: E402
+
 
 # Define a basic Language Model using PyTorch Lightning
 class BasicLM(L.LightningModule):
@@ -29,7 +35,7 @@ class BasicLM(L.LightningModule):
         epsilon: float = 1e-8,
         init_seed: int = 42,
         save_hyperparameters: bool = True,
-        local_soft_prompt: str | None = None,
+        local_soft_prompt = None,
         init_text: str | None = None,
         init_embedding_models: str | None = None,
     ) -> None:
@@ -64,8 +70,9 @@ class BasicLM(L.LightningModule):
         self.soft_prompt = torch.nn.Embedding(prompt_length, embedding_size)
         self.prompt_tokens = torch.arange(prompt_length).long()
 
+        # TODO: Implement differentiation between str and embedding
         if local_soft_prompt:
-            self.soft_prompt.load_state_dict(torch.load(local_soft_prompt))
+            self.soft_prompt = local_soft_prompt
         else:
             if init_text:
                 init_ids = tokenizer(init_text, add_special_tokens=False)["input_ids"]
@@ -161,10 +168,36 @@ class BasicLM(L.LightningModule):
         outputs = self(**batch)
         loss = torch.stack([output.loss for output in outputs]).mean()
         self.log("val/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
-        distance = torch.nn.functional.pairwise_distance(
-            self.init_soft_prompt.to(self.device), self.soft_prompt(self.prompt_tokens.to(self.device)), p=2
+        current_soft_prompt = self.soft_prompt(self.prompt_tokens.to(self.device))
+        initial_soft_prompt = self.init_soft_prompt.to(self.device)
+        self.log(
+            "val/distance_to_init",
+            calculate_sim(current_soft_prompt, initial_soft_prompt, "euclidean", pre_averaging=False),
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
         )
-        self.log("val/distance_to_init", torch.mean(distance).item(), on_step=False, on_epoch=True, sync_dist=True)
+        self.log(
+            "val/distance_to_init_on_avg_prompt",
+            calculate_sim(current_soft_prompt, initial_soft_prompt, "euclidean", pre_averaging=True),
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+        )
+        self.log(
+            "val/sim_to_init",
+            calculate_sim(current_soft_prompt, initial_soft_prompt, "cosine", pre_averaging=False),
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+        )
+        self.log(
+            "val/sim_to_init_on_avg_prompt",
+            calculate_sim(current_soft_prompt, initial_soft_prompt, "cosine", pre_averaging=True),
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+        )
 
     def configure_optimizers(self):
         # Configure the optimizers and learning rate schedulers
