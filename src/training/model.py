@@ -35,7 +35,7 @@ class BasicLM(L.LightningModule):
         epsilon: float = 1e-8,
         init_seed: int = 42,
         save_hyperparameters: bool = True,
-        local_soft_prompt=None,
+        local_soft_prompt: str =None,
         init_text: str | None = None,
         init_embedding_models: str | None = None,
     ) -> None:
@@ -70,9 +70,8 @@ class BasicLM(L.LightningModule):
         self.soft_prompt = torch.nn.Embedding(prompt_length, embedding_size)
         self.prompt_tokens = torch.arange(prompt_length).long()
 
-        # TODO: Implement differentiation between str and embedding
         if local_soft_prompt:
-            self.soft_prompt = local_soft_prompt
+            self.soft_prompt.load_state_dict(torch.load(local_soft_prompt))
         else:
             if init_text:
                 init_ids = tokenizer(init_text, add_special_tokens=False)["input_ids"]
@@ -136,6 +135,9 @@ class BasicLM(L.LightningModule):
         self.tokenizer = tokenizer
 
         self.init_soft_prompt = self.soft_prompt(self.prompt_tokens).detach().clone()
+
+    def set_soft_prompt_weight(self, soft_prompt_weight: torch.nn.Parameter):
+        self.soft_prompt.weight = soft_prompt_weight
 
     def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
         prompt = self.soft_prompt(self.prompt_tokens.to(self.device)).unsqueeze(0).expand(input_ids.shape[0], -1, -1)

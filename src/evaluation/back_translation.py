@@ -9,7 +9,7 @@ from utils import create_soft_prompt, get_model_names_from_numbers, load_init_te
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "soft_prompt_names",
+        "soft_prompt_name",
         type=str,
         help="Comma separated list of soft prompt names. If you do not know what soft prompt names are available check logs/explainable-soft-prompts.",
     )
@@ -63,8 +63,7 @@ def back_translation(
             tokens.append(torch.argmin(distance).item())
 
         tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
-        print(tokenizer.decode(torch.tensor(tokens)))
-        print(tokens)
+        print(",".join(tokenizer.decode(torch.tensor(tokens)).split(" ")))
 
 
 if __name__ == "__main__":
