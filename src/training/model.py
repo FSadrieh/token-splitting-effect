@@ -35,7 +35,7 @@ class BasicLM(L.LightningModule):
         epsilon: float = 1e-8,
         init_seed: int = 42,
         save_hyperparameters: bool = True,
-        local_soft_prompt = None,
+        local_soft_prompt=None,
         init_text: str | None = None,
         init_embedding_models: str | None = None,
     ) -> None:

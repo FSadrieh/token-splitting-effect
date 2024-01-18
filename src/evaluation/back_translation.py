@@ -8,8 +8,12 @@ from utils import create_soft_prompt, get_model_names_from_numbers, load_init_te
 
 def arg_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("soft_prompt_names", type=str)
-    parser.add_argument("model_numbers", type=str)
+    parser.add_argument(
+        "soft_prompt_names",
+        type=str,
+        help="Comma separated list of soft prompt names. If you do not know what soft prompt names are available check logs/explainable-soft-prompts.",
+    )
+    parser.add_argument("model_numbers", type=str, help="Comma separated list of model numbers to visualise the embeddings of.")
     parser.add_argument(
         "-i", "--initial_prompt", action="store_true", help="Back translate the initial prompt instead of the trained one."
     )

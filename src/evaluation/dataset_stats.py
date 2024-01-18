@@ -35,6 +35,7 @@ def main():
     print(f"Number of reviews with length > {args.max_length}: {len([l for l in lengths if l > args.max_length])}")
     if args.output:
         import seaborn as sns
+
         sns.displot(lengths)
         plt.savefig(args.output)
 

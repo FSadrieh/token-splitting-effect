@@ -15,7 +15,7 @@ from args import TrainingArgs
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("soft_prompt_name", type=str)
-    parser.add_argument("model_numbers", type=str)
+    parser.add_argument("model_numbers", type=str, help="Comma separated list of model numbers to test on.")
     parser.add_argument("config", type=str, help="path to the config file for the validation")
     parser.add_argument("dropped_out_tokens", type=str, help="Comma separated list of tokens to drop out")
     parser.add_argument("-a", "--accelerator", type=str, default="cuda", help="Supports: cuda, cpu, tpu, mps")
@@ -28,14 +28,14 @@ def main():
     seed = seed_everything(workers=True, seed=42)
 
     args = arg_parser()
-    
+
     soft_prompt_path = f"logs/explainable-soft-prompts/{args.soft_prompt_name}/checkpoints/soft_prompt.pt"
     soft_prompt = torch.nn.Embedding(args.prompt_length, args.embedding_size)
     soft_prompt.load_state_dict(torch.load(soft_prompt_path))
-    
+
     weigth = soft_prompt.weight.detach().clone()
     for dropped_out_token in args.dropped_out_tokens.split(","):
-        weigth[int(dropped_out_token),:] = torch.zeros(args.embedding_size)
+        weigth[int(dropped_out_token), :] = torch.zeros(args.embedding_size)
 
     soft_prompt.weight = torch.nn.Parameter(weigth)
 
@@ -79,7 +79,7 @@ def main():
         print(f"Validating {args.soft_prompt_name} on {model_name}")
         val_losses.append(trainer.validate(model, dm)[0]["val/loss"])
 
-    with open(f"logs/explainable-soft-prompts/{args.soft_prompt_name}/checkpoints/val_losses.csv", "w+") as f:
+    with open(f"logs/explainable-soft-prompts/{args.soft_prompt_name}/checkpoints/prompt_sclicing.csv", "w+") as f:
         writer = csv.writer(f)
         writer.writerow(["seed", "val_loss", "trained_on"])
         for i, val_loss in enumerate(val_losses):

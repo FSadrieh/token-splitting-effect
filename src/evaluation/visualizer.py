@@ -13,18 +13,36 @@ DEFAULT_COLORS = ["blue", "orange", "green", "red", "purple", "brown", "pink", "
 
 def arg_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("soft_prompt_names", type=str)
-    parser.add_argument("model_numbers", type=str)
-    parser.add_argument("output_path", type=str)
-    parser.add_argument("-i", "--init_text", type=str, default=None)
+    parser.add_argument(
+        "soft_prompt_names",
+        type=str,
+        help="Comma separated list of soft prompt names. If you do not know what soft prompt names are available check logs/explainable-soft-prompts.",
+    )
+    parser.add_argument("model_numbers", type=str, help="Comma separated list of model numbers to visualise the embeddings of.")
+    parser.add_argument(
+        "output_name", type=str, help="Path to save the plot to. The plot will be saved in the visualizations folder."
+    )
+    parser.add_argument(
+        "-i",
+        "--init_text",
+        type=str,
+        default=None,
+        help="If set the init text will be used in the plot. If init_text=='default' the init text from the specified soft prompt will be used.",
+    )
     parser.add_argument(
         "-m",
         "--init_text_model",
         type=str,
         default=None,
-        help="Comma separated list of models to use for init text. If not specified the models for the embeddings will be used",
+        help="Comma separated list of models to use for init text. If not specified the models for the embeddings will be used. Will be ignored if init_text is not set or set to 'default'.",
     )
-    parser.add_argument("-a", "--average", action="store_true", default=False)
+    parser.add_argument(
+        "-a",
+        "--average",
+        action="store_true",
+        default=False,
+        help="If set the average of the soft prompts will be used instead of the soft prompts themselves.",
+    )
     parser.add_argument("-e", "--embedding_size", type=int, default=768)
     parser.add_argument("-p", "--prompt_length", type=int, default=16)
     return parser.parse_args()
@@ -51,7 +69,7 @@ def reduce_embedding_space(embedding_space: torch.Tensor, n_components: int = 50
 
 def plot_embedding_space(
     embedding_space: torch.Tensor,
-    output_path: str,
+    output_name: str,
     model_embedding_size: int,
     prompt_length: int,
     prompts: list,
@@ -84,7 +102,7 @@ def plot_embedding_space(
         )
         lower_bound = upper_bound
     ax.legend()
-    fig.savefig(os.path.join("visualizations", output_path))
+    fig.savefig(os.path.join("visualizations", output_name))
 
 
 def prepare_soft_prompts(
@@ -105,7 +123,7 @@ def main():
     visualize(
         soft_prompt_names,
         model_names,
-        args.output_path,
+        args.output_name,
         args.init_text,
         args.init_text_model,
         args.average,
@@ -117,7 +135,7 @@ def main():
 def visualize(
     soft_prompt_names: list,
     model_names: list,
-    output_path: str,
+    output_name: str,
     init_text: str,
     init_text_model: str,
     is_avg: bool,
@@ -125,7 +143,7 @@ def visualize(
     prompt_length: int,
 ):
     print(
-        f"Visualizing soft prompts: {soft_prompt_names} and init text: {init_text}, on the models {model_names}. Pre averaging is {is_avg}. Saving to {output_path}."
+        f"Visualizing soft prompts: {soft_prompt_names} and init text: {init_text}, on the models {model_names}. Pre averaging is {is_avg}. Saving to {output_name}."
     )
     soft_prompts, prompt_length = prepare_soft_prompts(soft_prompt_names, prompt_length, embedding_size, is_avg)
     init_model = init_text_model if init_text_model else model_names[0]
@@ -144,7 +162,7 @@ def visualize(
     reduced_embedding_space = reduce_embedding_space(embedding_space)
     plot_embedding_space(
         reduced_embedding_space,
-        output_path=output_path,
+        output_name=output_name,
         model_embedding_size=embeddings.shape[0] // len(model_names),
         prompt_length=prompt_length,
         prompts=soft_prompt_names,

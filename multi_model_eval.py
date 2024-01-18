@@ -22,7 +22,7 @@ def arg_parser():
 
 
 def main():
-    seed = seed_everything(workers=True, seed=42)
+    seed_everything(workers=True, seed=42)
 
     args = arg_parser()
     # We want to validate the modle on each of the 25 models

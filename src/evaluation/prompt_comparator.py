@@ -11,17 +11,36 @@ from similarity_calculation import calculate_sim  # noqa: E402
 
 def arg_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("soft_prompt_names", type=str)
-    parser.add_argument("output_path", type=str)
-    parser.add_argument("-i", "--init_text", type=str, default=None)
+    parser.add_argument(
+        "soft_prompt_names",
+        type=str,
+        help="Comma separated list of soft prompt names. If you do not know what soft prompt names are available check logs/explainable-soft-prompts.",
+    )
+    parser.add_argument(
+        "output_name", type=str, help="Path to save the plot to. The plot will be saved in the similarities folder."
+    )
+    parser.add_argument(
+        "-i",
+        "--init_text",
+        type=str,
+        default=None,
+        help="If set the init text will be used in the similarity calculation. If init_text=='default' the init text from the specified soft prompt will be used.",
+    )
     # Note it does not make a lot of sense to use the init text with soft prompts trained on other models, since the init text would be different
-    parser.add_argument("-m", "--model_numbers", type=str, default=None)
+    parser.add_argument(
+        "-m",
+        "--model_numbers",
+        type=str,
+        default=None,
+        help="Comma separated list of model numbers to use for init text. If not specified the models for the soft prompts will be used. Will be ignored if init_text is not set or set to 'default'.",
+    )
     parser.add_argument(
         "-pa",
         "--pre_averaging",
         action="store_true",
         help="If set the similarity is calculated between the average of the prompt tokens of each prompt. Does not make sense to use with euclidean similarity.",
     )
+    # TODO: Should we remove euclidean similarity?
     parser.add_argument(
         "-d", "--distance_metric", type=str, default="euclidean", help="Supports: euclidean_sim, euclidean, cosine"
     )
@@ -51,7 +70,7 @@ def main():
         args.distance_metric,
         args.embedding_size,
         args.prompt_length,
-        args.output_path,
+        args.output_name,
         args.similarity_between_prompt_tokens,
     )
 
@@ -64,7 +83,7 @@ def compare(
     distance_metric: str,
     embedding_size: int,
     prompt_length: int,
-    output_path: str,
+    output_name: str,
     similarity_between_prompt_tokens: bool,
 ):
     print(
@@ -104,8 +123,8 @@ def compare(
             similarity_dict[(soft_prompt_names[i], soft_prompt_names[j])] = round(sim, 3)
             similarity_dict[(soft_prompt_names[j], soft_prompt_names[i])] = round(sim, 3)
 
-    print(f"Saving the results to similarities/{output_path}.csv")
-    with open(f"similarities/{output_path}.csv", "w+") as f:
+    print(f"Saving the results to similarities/{output_name}.csv")
+    with open(f"similarities/{output_name}.csv", "w+") as f:
         writer = csv.writer(f)
         writer.writerow([""] + soft_prompt_names)
         for i in range(len(soft_prompt_names)):
