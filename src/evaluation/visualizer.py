@@ -2,13 +2,19 @@ import argparse
 import torch
 import os
 
+import time
+import pickle
+import numpy as np
+
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
+import umap
+
 from matplotlib import pyplot as plt
 
 from utils import create_soft_prompts, create_init_text, get_model_names_from_numbers, load_init_text
 
-DEFAULT_COLORS = ["blue", "orange", "green", "red", "purple", "brown", "pink", "gray", "olive", "cyan", "black"]
+DEFAULT_COLORS = ["gray", "red", "blue", "orange", "green", "purple", "brown", "pink", "olive", "cyan", "black"]
 
 
 def arg_parser():
@@ -45,6 +51,7 @@ def arg_parser():
     )
     parser.add_argument("-e", "--embedding_size", type=int, default=768)
     parser.add_argument("-p", "--prompt_length", type=int, default=16)
+    parser.add_argument("--method", type=str, default="umap", help="Method to use for dimensionality reduction, choose between 'umap' and 'tsne'.")
     return parser.parse_args()
 
 
@@ -52,19 +59,34 @@ def get_model_embedding_spaces(models: list) -> (torch.Tensor, list):
     from transformers.models.auto.modeling_auto import AutoModelForMaskedLM
 
     embeddings = []
+    labels = []
     for model in models:
-        model = AutoModelForMaskedLM.from_pretrained(model)
-        embeddings.append(model.get_input_embeddings().weight)
-    return torch.cat(embeddings, dim=0), models
+        model_instance = AutoModelForMaskedLM.from_pretrained(model)
+        model_embeddings = model_instance.get_input_embeddings().weight
+        embeddings.append(model_embeddings)
+        labels.extend([model] * model_embeddings.size(0))
+    return torch.cat(embeddings, dim=0), models, labels
 
 
-def reduce_embedding_space(embedding_space: torch.Tensor, n_components: int = 50) -> torch.Tensor:
+def reduce_embedding_space(embedding_space: torch.Tensor, n_components: int = 50, method: str = "umap") -> torch.Tensor:
     print(f"Reducing embedding space to {n_components} dimensions.")
+    start = time.time()
     pca = PCA(n_components=n_components)
     reduced_embedding_space = pca.fit_transform(embedding_space)
+    print(f"PCA took {time.time() - start} seconds.")
+    
+    if method == "umap":
+        start = time.time()
+        mapper = umap.UMAP(metric="cosine", n_neighbors=50).fit(reduced_embedding_space)
+        result = mapper.transform(reduced_embedding_space)
+        print(f"UMAP took {time.time() - start} seconds.")
+    elif method == "tsne":    
+        tsne = TSNE(random_state=1, metric="cosine")
+        result = tsne.fit_transform(reduced_embedding_space)
+    else:
+        raise ValueError(f"Method {method} is not supported.")
 
-    tsne = TSNE(random_state=1, metric="cosine")
-    return tsne.fit_transform(reduced_embedding_space)
+    return result
 
 
 def plot_embedding_space(
@@ -129,6 +151,7 @@ def main():
         args.average,
         args.embedding_size,
         args.prompt_length,
+        args.method
     )
 
 
