@@ -97,32 +97,47 @@ def plot_embedding_space(
     prompts: list,
     model_names: list,
     colors: list = DEFAULT_COLORS,
+    labels: list = None,
 ) -> None:
     """
     Plots the embedding space in steps. First the embedding spaces from the different models are plotted with a low alpha value. Then the prompts and init texts are plotted with a higher alpha value.
     """
-    fig, ax = plt.subplots(figsize=(10, 8))
-    lower_bound = 0
-    for i in range(len(model_names)):
-        upper_bound = lower_bound + model_embedding_size
-        ax.scatter(
-            embedding_space[lower_bound:upper_bound, 0],
-            embedding_space[lower_bound:upper_bound, 1],
-            alpha=0.1,
-            color=colors[i],
-            label=f"Embeddings from {model_names[i]}",
-        )
-        lower_bound = upper_bound
-    for i in range(len(prompts)):
-        upper_bound = lower_bound + prompt_length
-        ax.scatter(
-            embedding_space[lower_bound:upper_bound, 0],
-            embedding_space[lower_bound:upper_bound, 1],
-            alpha=1,
-            color=colors[i + len(model_names)],
-            label=f"{prompts[i]}",
-        )
-        lower_bound = upper_bound
+    fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
+    
+    # If no color list is provided, generate a colormap
+    if colors is None:
+        unique_labels = list(set(labels))
+        cmap = plt.get_cmap("viridis")
+        colors = cmap(np.linspace(0, 1, len(unique_labels)))
+
+        # Map each label to a color
+        label_to_color = {label: colors[i] for i, label in enumerate(unique_labels)}
+    else:
+        label_to_color = {label: colors[i] for i, label in enumerate(set(labels))}
+
+    # Plot each point with its corresponding color
+    for label in set(labels):
+        indices = [i for i, l in enumerate(labels) if l == label]
+        if label in prompts:
+            ax.scatter(
+                embedding_space[indices, 0],
+                embedding_space[indices, 1],
+                alpha=0.5,
+                s=5,
+                color=label_to_color[label],
+                label=label
+            )
+            for (i, (x, y)) in enumerate(zip(embedding_space[indices, 0], embedding_space[indices, 1])):
+                ax.annotate(i, (x, y), color=label_to_color[label])
+        else:
+            ax.scatter(
+                embedding_space[indices, 0],
+                embedding_space[indices, 1],
+                alpha=0.01,
+                s=5,
+                color=label_to_color[label],
+                label=label
+            )
     ax.legend()
     fig.savefig(os.path.join("visualizations", output_name))
 
@@ -130,12 +145,13 @@ def plot_embedding_space(
 def prepare_soft_prompts(
     soft_prompt_names: list, prompt_length: int, embedding_size: int, is_avg: bool
 ) -> (torch.Tensor, list, int):
-    soft_prompt_list = create_soft_prompts(soft_prompt_names, prompt_length, embedding_size)
+    soft_prompt_list, labels = create_soft_prompts(soft_prompt_names, prompt_length, embedding_size)
     if is_avg:
         soft_prompt_list = [torch.mean(soft_prompt, dim=0) for soft_prompt in soft_prompt_list]
         prompt_length = 1
+        labels = [label + "_avg" for label in labels]
     soft_prompts = torch.cat(soft_prompt_list, dim=0)
-    return soft_prompts, prompt_length
+    return soft_prompts, prompt_length, labels
 
 
 def main():
@@ -164,11 +180,12 @@ def visualize(
     is_avg: bool,
     embedding_size: int,
     prompt_length: int,
+    method: str
 ):
     print(
-        f"Visualizing soft prompts: {soft_prompt_names} and init text: {init_text}, on the models {model_names}. Pre averaging is {is_avg}. Saving to {output_name}."
+        f"Visualizing soft prompts: {soft_prompt_names} and init text: {init_text}, on the models {model_names}. Pre averaging is {is_avg}. Method is {method}. Saving to {output_name}."
     )
-    soft_prompts, prompt_length = prepare_soft_prompts(soft_prompt_names, prompt_length, embedding_size, is_avg)
+    soft_prompts, prompt_length, soft_prompt_labels = prepare_soft_prompts(soft_prompt_names, prompt_length, embedding_size, is_avg)
     init_model = init_text_model if init_text_model else model_names[0]
     if init_text:
         init_text, init_text_name = (
@@ -179,10 +196,16 @@ def visualize(
         soft_prompts = torch.cat([soft_prompts, init_text], dim=0)
         soft_prompt_names.append(init_text_name)
 
-    embeddings, model_names = get_model_embedding_spaces(model_names)
+    embeddings, model_names, model_labels = get_model_embedding_spaces(model_names)
     embedding_space = torch.cat([embeddings, soft_prompts], dim=0).detach().numpy()
 
-    reduced_embedding_space = reduce_embedding_space(embedding_space)
+    reduced_embedding_space = reduce_embedding_space(embedding_space, method=method)
+    with open('cache.pickle', 'wb') as handle:
+        pickle.dump([reduced_embedding_space, embeddings, model_names, prompt_length, soft_prompt_names, soft_prompt_labels, model_labels], handle)
+    
+    with open('cache.pickle', 'rb') as handle:
+        reduced_embedding_space, embeddings, model_names, prompt_length, soft_prompt_names, soft_prompt_labels, model_labels = pickle.load(handle)
+
     plot_embedding_space(
         reduced_embedding_space,
         output_name=output_name,
@@ -190,6 +213,7 @@ def visualize(
         prompt_length=prompt_length,
         prompts=soft_prompt_names,
         model_names=model_names,
+        labels=model_labels + soft_prompt_labels,
     )
 
 

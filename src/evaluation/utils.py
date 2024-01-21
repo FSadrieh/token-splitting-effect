@@ -53,9 +53,13 @@ def create_soft_prompt(soft_prompt_name: str, prompt_length: int, embedding_size
 
 def create_soft_prompts(soft_prompt_names: list, prompt_length: int, embedding_size: int) -> list:
     soft_prompt_list = []
+    labels = []
     for soft_prompt_name in soft_prompt_names:
-        soft_prompt_list.append(create_soft_prompt(soft_prompt_name, prompt_length, embedding_size))
-    return soft_prompt_list
+        soft_prompt = create_soft_prompt(soft_prompt_name, prompt_length, embedding_size)
+        # print(f"Soft prompt shape: {soft_prompt.shape}")
+        soft_prompt_list.append(soft_prompt)
+        labels.extend([soft_prompt_name] * soft_prompt.size(0))
+    return soft_prompt_list, labels
 
 
 def get_model_names_from_numbers(model_numbers: list) -> list:
