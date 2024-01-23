@@ -38,17 +38,18 @@ def create_init_texts(init_texts: list, model_names: list, prompt_length: int, e
 
 def load_init_text(soft_prompt_name: str) -> (list, list):
     init_text_path = f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/init_soft_prompt.pt"
+    # Since we save a tensor we do not have to call weight here
     init_text = torch.load(init_text_path)
     init_texts_name = f"init text of {soft_prompt_name}"
     return init_text, init_texts_name
 
 
-def create_soft_prompt(soft_prompt_name: str, prompt_length: int, embedding_size: int) -> torch.Tensor:
+def create_soft_prompt(soft_prompt_name: str) -> torch.Tensor:
+    """
+    This method extracts the soft prompt weight from the saved soft prompt state dict.
+    """
     soft_prompt_path = f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/soft_prompt.pt"
-    soft_prompt = torch.nn.Embedding(prompt_length, embedding_size)
-    soft_prompt.load_state_dict(torch.load(soft_prompt_path))
-    prompt_tokens = torch.arange(prompt_length).long()
-    return soft_prompt(prompt_tokens)
+    return torch.load(soft_prompt_path)["weight"]
 
 
 def create_soft_prompts(soft_prompt_names: list, prompt_length: int, embedding_size: int) -> list:
@@ -63,7 +64,4 @@ def create_soft_prompts(soft_prompt_names: list, prompt_length: int, embedding_s
 
 
 def get_model_names_from_numbers(model_numbers: list) -> list:
-    model_names = []
-    for model_number in model_numbers:
-        model_names.append(f"google/multiberts-seed_{model_number}")
-    return model_names
+    return [f"google/multiberts-seed_{model_number}" for model_number in model_numbers]

@@ -21,8 +21,9 @@ def arg_parser():
     parser.add_argument(
         "dropped_out_tokens",
         type=str,
-        help="Comma separated list of tokens to drop out. If you want to drop out all tokens one by one, use 'all'.",
+        help="Comma separated list of tokens to drop out. If you want to drop out all tokens one by one, use 'all'. If all is set we will save a csv with all the losses for all the tokens.",
     )
+    parser.add_argument("-i", "--inverse", action="store_true", help="If set we drop out all tokens except th dropped_out_tokens. Ignored if dropped_out_tokens is 'all'.")
     parser.add_argument("-a", "--accelerator", type=str, default="cuda", help="Supports: cuda, cpu, tpu, mps")
     parser.add_argument("-p", "--prompt_length", type=int, default=16)
     parser.add_argument("-e", "--embedding_size", type=int, default=768)
@@ -36,7 +37,7 @@ def main():
     model_names = get_model_names_from_numbers(args.model_numbers.split(","))
 
     weights = create_soft_prompt_weights(
-        args.soft_prompt_name, args.dropped_out_tokens, args.prompt_length, args.embedding_size
+        args.soft_prompt_name, args.dropped_out_tokens, args.prompt_length, args.embedding_size, args.inverse
     )
     model_args, dm, trainer = create_trainer_etc(args.config, model_names, args.accelerator, args.prompt_length)
 
@@ -50,18 +51,19 @@ def main():
             print(f"Validating {args.soft_prompt_name} on {model_name}. The token {i} is dropped out.")
             val_losses[(model_name, i)] = trainer.validate(model, dm)[0]["val/loss"]
 
-    with open(
-        f"logs/explainable-soft-prompts/{args.soft_prompt_name}/checkpoints/prompt_splicing_on_{args.model_numbers.replace(',','_')}.csv",
-        "w+",
-    ) as f:
-        writer = csv.writer(f)
-        writer.writerow(["seed"] + [i for i in range(args.prompt_length)])
-        for i in range(len(model_names)):
-            writer.writerow([model_names[i]] + [val_losses[(model_names[i], j)] for j in range(args.prompt_length)])
+    if args.dropped_out_tokens == "all":
+        with open(
+            f"logs/explainable-soft-prompts/{args.soft_prompt_name}/checkpoints/prompt_token_drop_out_on_{args.model_numbers.replace(',','_')}.csv",
+            "w+",
+        ) as f:
+            writer = csv.writer(f)
+            writer.writerow(["seed"] + [i for i in range(args.prompt_length)])
+            for i in range(len(model_names)):
+                writer.writerow([model_names[i]] + [val_losses[(model_names[i], j)] for j in range(args.prompt_length)])
 
 
 def create_soft_prompt_weights(
-    soft_prompt_name: str, dropped_out_tokens: str, prompt_length: int, embedding_size: int
+    soft_prompt_name: str, dropped_out_tokens: str, prompt_length: int, embedding_size: int, inverse: bool
 ) -> List[torch.nn.Parameter]:
     soft_prompt_path = f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/soft_prompt.pt"
     soft_prompt = torch.nn.Embedding(prompt_length, embedding_size)
@@ -76,8 +78,12 @@ def create_soft_prompt_weights(
 
         return weights
     weight = soft_prompt.weight.detach().clone()
-    for i in dropped_out_tokens.split(","):
-        weight[i, :] = torch.zeros(embedding_size)
+    dropped_out_tokens = dropped_out_tokens.split(",")
+    if inverse:
+        dropped_out_tokens = [i for i in range(prompt_length) if str(i) not in dropped_out_tokens]
+    print("Dropped out tokens:", dropped_out_tokens)
+    for i in dropped_out_tokens:
+        weight[int(i), :] = torch.zeros(embedding_size)
     return [torch.nn.Parameter(weight)]
 
 
