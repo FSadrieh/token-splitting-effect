@@ -106,14 +106,14 @@ def plot_embedding_space(
     
     # If no color list is provided, generate a colormap
     if colors is None:
-        unique_labels = list(set(labels))
+        unique_labels = sorted(set(labels))
         cmap = plt.get_cmap("viridis")
         colors = cmap(np.linspace(0, 1, len(unique_labels)))
 
         # Map each label to a color
         label_to_color = {label: colors[i] for i, label in enumerate(unique_labels)}
     else:
-        label_to_color = {label: colors[i] for i, label in enumerate(set(labels))}
+        label_to_color = {label: colors[i] for i, label in enumerate(sorted(set(labels)))}
 
     # Plot each point with its corresponding color
     for label in set(labels):
@@ -138,7 +138,9 @@ def plot_embedding_space(
                 color=label_to_color[label],
                 label=label
             )
-    ax.legend()
+    legend = ax.legend()
+    for lh in legend.legend_handles: 
+        lh.set_alpha(1)
     fig.savefig(os.path.join("visualizations", output_name))
 
 
