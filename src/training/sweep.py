@@ -1,8 +1,11 @@
 import wandb
 import argparse
 
-import train
-from cfgs.sweep_cfgs import sweep_cfgs
+import sys
+from os import path
+sys.path.append(path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
+import train # noqa: E402
+from cfgs.sweep_cfgs import sweep_cfgs # noqa: E402
 
 
 def arg_parser():

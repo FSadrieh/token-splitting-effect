@@ -51,7 +51,12 @@ def arg_parser():
     )
     parser.add_argument("-e", "--embedding_size", type=int, default=768)
     parser.add_argument("-p", "--prompt_length", type=int, default=16)
-    parser.add_argument("--method", type=str, default="umap", help="Method to use for dimensionality reduction, choose between 'umap' and 'tsne'.")
+    parser.add_argument(
+        "--method",
+        type=str,
+        default="umap",
+        help="Method to use for dimensionality reduction, choose between 'umap' and 'tsne'.",
+    )
     return parser.parse_args()
 
 
@@ -74,13 +79,13 @@ def reduce_embedding_space(embedding_space: torch.Tensor, n_components: int = 50
     pca = PCA(n_components=n_components)
     reduced_embedding_space = pca.fit_transform(embedding_space)
     print(f"PCA took {time.time() - start} seconds.")
-    
+
     if method == "umap":
         start = time.time()
         mapper = umap.UMAP(metric="cosine", n_neighbors=50).fit(reduced_embedding_space)
         result = mapper.transform(reduced_embedding_space)
         print(f"UMAP took {time.time() - start} seconds.")
-    elif method == "tsne":    
+    elif method == "tsne":
         tsne = TSNE(random_state=1, metric="cosine")
         result = tsne.fit_transform(reduced_embedding_space)
     else:
@@ -103,7 +108,7 @@ def plot_embedding_space(
     Plots the embedding space in steps. First the embedding spaces from the different models are plotted with a low alpha value. Then the prompts and init texts are plotted with a higher alpha value.
     """
     fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
-    
+
     # If no color list is provided, generate a colormap
     if colors is None:
         unique_labels = sorted(set(labels))
@@ -125,9 +130,9 @@ def plot_embedding_space(
                 alpha=0.5,
                 s=5,
                 color=label_to_color[label],
-                label=label
+                label=label,
             )
-            for (i, (x, y)) in enumerate(zip(embedding_space[indices, 0], embedding_space[indices, 1])):
+            for i, (x, y) in enumerate(zip(embedding_space[indices, 0], embedding_space[indices, 1])):
                 ax.annotate(i, (x, y), color=label_to_color[label])
         else:
             ax.scatter(
@@ -136,10 +141,10 @@ def plot_embedding_space(
                 alpha=0.01,
                 s=5,
                 color=label_to_color[label],
-                label=label
+                label=label,
             )
     legend = ax.legend()
-    for lh in legend.legend_handles: 
+    for lh in legend.legend_handles:
         lh.set_alpha(1)
     fig.savefig(os.path.join("visualizations", output_name))
 
@@ -169,7 +174,7 @@ def main():
         args.average,
         args.embedding_size,
         args.prompt_length,
-        args.method
+        args.method,
     )
 
 
@@ -182,12 +187,14 @@ def visualize(
     is_avg: bool,
     embedding_size: int,
     prompt_length: int,
-    method: str
+    method: str,
 ):
     print(
         f"Visualizing soft prompts: {soft_prompt_names} and init text: {init_text}, on the models {model_names}. Pre averaging is {is_avg}. Method is {method}. Saving to {output_name}."
     )
-    soft_prompts, prompt_length, soft_prompt_labels = prepare_soft_prompts(soft_prompt_names, prompt_length, embedding_size, is_avg)
+    soft_prompts, prompt_length, soft_prompt_labels = prepare_soft_prompts(
+        soft_prompt_names, prompt_length, embedding_size, is_avg
+    )
     init_model = init_text_model if init_text_model else model_names[0]
     if init_text:
         init_text, init_text_name = (
@@ -202,11 +209,30 @@ def visualize(
     embedding_space = torch.cat([embeddings, soft_prompts], dim=0).detach().numpy()
 
     reduced_embedding_space = reduce_embedding_space(embedding_space, method=method)
-    with open('cache.pickle', 'wb') as handle:
-        pickle.dump([reduced_embedding_space, embeddings, model_names, prompt_length, soft_prompt_names, soft_prompt_labels, model_labels], handle)
-    
-    with open('cache.pickle', 'rb') as handle:
-        reduced_embedding_space, embeddings, model_names, prompt_length, soft_prompt_names, soft_prompt_labels, model_labels = pickle.load(handle)
+    with open("cache.pickle", "wb") as handle:
+        pickle.dump(
+            [
+                reduced_embedding_space,
+                embeddings,
+                model_names,
+                prompt_length,
+                soft_prompt_names,
+                soft_prompt_labels,
+                model_labels,
+            ],
+            handle,
+        )
+
+    with open("cache.pickle", "rb") as handle:
+        (
+            reduced_embedding_space,
+            embeddings,
+            model_names,
+            prompt_length,
+            soft_prompt_names,
+            soft_prompt_labels,
+            model_labels,
+        ) = pickle.load(handle)
 
     plot_embedding_space(
         reduced_embedding_space,

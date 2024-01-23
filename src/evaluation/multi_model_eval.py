@@ -3,12 +3,15 @@ from simple_parsing import parse_known_args
 from transformers import AutoTokenizer
 from lightning import Trainer, seed_everything
 import csv
+import sys
+from os import path
 
+sys.path.append(path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
+from src.evaluation.utils import get_model_names_from_numbers  # noqa: E402
+from src.training.model import BasicLM  # noqa: E402
+from src.training.data_loading import LMDataModule  # noqa: E402
+from args import TrainingArgs # noqa: E402
 
-from src.evaluation.utils import get_model_names_from_numbers
-from src.training.model import BasicLM
-from src.training.data_loading import LMDataModule
-from args import TrainingArgs
 
 
 def arg_parser():

@@ -24,9 +24,7 @@ def arg_parser():
 def main():
     args = arg_parser()
     model_names = get_model_names_from_numbers(args.model_numbers.split(","))
-    back_translation(
-        args.soft_prompt_name, model_names, args.distance_metric, args.initial_prompt
-    )
+    back_translation(args.soft_prompt_name, model_names, args.distance_metric, args.initial_prompt)
 
 
 def back_translation(
@@ -60,7 +58,7 @@ def back_translation(
         tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
         detokenized_tokens = [tokenizer.decode(torch.tensor(token)) for token in tokens]
 
-        print(','.join(detokenized_tokens))
+        print(",".join(detokenized_tokens))
 
 
 if __name__ == "__main__":
