@@ -12,7 +12,13 @@ import umap
 
 from matplotlib import pyplot as plt
 
-from utils import create_soft_prompts, create_init_text, get_model_names_from_numbers, load_init_text
+from utils import (
+    create_soft_prompts,
+    create_init_text,
+    get_model_names_from_numbers,
+    load_init_text,
+    get_model_embedding_spaces,
+)
 
 DEFAULT_COLORS = ["gray", "red", "blue", "orange", "green", "purple", "brown", "pink", "olive", "cyan", "black"]
 
@@ -60,19 +66,6 @@ def arg_parser():
     return parser.parse_args()
 
 
-def get_model_embedding_spaces(models: list) -> (torch.Tensor, list):
-    from transformers.models.auto.modeling_auto import AutoModelForMaskedLM
-
-    embeddings = []
-    labels = []
-    for model in models:
-        model_instance = AutoModelForMaskedLM.from_pretrained(model)
-        model_embeddings = model_instance.get_input_embeddings().weight
-        embeddings.append(model_embeddings)
-        labels.extend([model] * model_embeddings.size(0))
-    return torch.cat(embeddings, dim=0), models, labels
-
-
 def reduce_embedding_space(embedding_space: torch.Tensor, n_components: int = 50, method: str = "umap") -> torch.Tensor:
     print(f"Reducing embedding space to {n_components} dimensions.")
     start = time.time()
@@ -97,10 +90,7 @@ def reduce_embedding_space(embedding_space: torch.Tensor, n_components: int = 50
 def plot_embedding_space(
     embedding_space: torch.Tensor,
     output_name: str,
-    model_embedding_size: int,
-    prompt_length: int,
     prompts: list,
-    model_names: list,
     colors: list = DEFAULT_COLORS,
     labels: list = None,
 ) -> None:
@@ -109,6 +99,7 @@ def plot_embedding_space(
     """
     fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
 
+    # TODO: Kann dieser Teil überhaupt im code aufgerufen werden?
     # If no color list is provided, generate a colormap
     if colors is None:
         unique_labels = sorted(set(labels))
@@ -152,7 +143,7 @@ def plot_embedding_space(
 def prepare_soft_prompts(
     soft_prompt_names: list, prompt_length: int, embedding_size: int, is_avg: bool
 ) -> (torch.Tensor, list, int):
-    soft_prompt_list, labels = create_soft_prompts(soft_prompt_names, prompt_length, embedding_size)
+    soft_prompt_list, labels = create_soft_prompts(soft_prompt_names)
     if is_avg:
         soft_prompt_list = [torch.mean(soft_prompt, dim=0) for soft_prompt in soft_prompt_list]
         prompt_length = 1
@@ -236,11 +227,8 @@ def visualize(
 
     plot_embedding_space(
         reduced_embedding_space,
-        output_name=output_name,
-        model_embedding_size=embeddings.shape[0] // len(model_names),
         prompt_length=prompt_length,
         prompts=soft_prompt_names,
-        model_names=model_names,
         labels=model_labels + soft_prompt_labels,
     )
 

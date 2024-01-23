@@ -1,4 +1,15 @@
 import torch
+from simple_parsing import parse_known_args
+from transformers import AutoTokenizer
+from lightning import Trainer
+from typing import List
+
+import sys
+from os import path
+
+sys.path.append(path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
+from src.training.data_loading import LMDataModule  # noqa: E402
+from args import TrainingArgs  # noqa: E402
 
 
 def create_init_text(init_text: str, model_name: str, embedding_size: int, prompt_length: int) -> torch.Tensor:
@@ -50,11 +61,11 @@ def create_soft_prompt(soft_prompt_name: str) -> torch.Tensor:
     return torch.load(soft_prompt_path)["weight"]
 
 
-def create_soft_prompts(soft_prompt_names: list, prompt_length: int, embedding_size: int) -> list:
+def create_soft_prompts(soft_prompt_names: list) -> list:
     soft_prompt_list = []
     labels = []
     for soft_prompt_name in soft_prompt_names:
-        soft_prompt = create_soft_prompt(soft_prompt_name, prompt_length, embedding_size)
+        soft_prompt = create_soft_prompt(soft_prompt_name)
         # print(f"Soft prompt shape: {soft_prompt.shape}")
         soft_prompt_list.append(soft_prompt)
         labels.extend([soft_prompt_name] * soft_prompt.size(0))
@@ -63,3 +74,53 @@ def create_soft_prompts(soft_prompt_names: list, prompt_length: int, embedding_s
 
 def get_model_names_from_numbers(model_numbers: list) -> list:
     return [f"google/multiberts-seed_{model_number}" for model_number in model_numbers]
+
+
+def create_trainer_etc(config: str, model_for_tokenizer: str, accelerator: str, prompt_length: int):
+    training_args, __ = parse_known_args(TrainingArgs, config_path=config)
+
+    tokenizer = AutoTokenizer.from_pretrained(model_for_tokenizer, use_fast=True)
+
+    model_args = dict(
+        tokenizer=tokenizer,
+        from_scratch=training_args.from_scratch,
+        learning_rate=training_args.learning_rate,
+        weight_decay=training_args.weight_decay,
+        beta1=training_args.beta1,
+        beta2=training_args.beta2,
+        lr_schedule=training_args.lr_schedule,
+        warmup_period=training_args.warmup_period,
+        prompt_length=training_args.prompt_length,
+        init_text=training_args.init_text,
+        init_embedding_models=training_args.init_embedding_models,
+        init_embedding_mode=training_args.init_embedding_mode,
+        init_seed=training_args.init_seed,
+    )
+
+    dm = LMDataModule(training_args=training_args, tokenizer=tokenizer, prompt_length=prompt_length)
+
+    trainer = Trainer(
+        max_epochs=training_args.training_goal,
+        devices=training_args.num_devices,
+        accelerator=accelerator,
+        strategy=training_args.distributed_strategy,
+        deterministic=training_args.force_deterministic,
+        precision=training_args.precision,
+        gradient_clip_val=training_args.grad_clip,
+        inference_mode=not training_args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
+    )
+
+    return model_args, dm, trainer
+
+
+def get_model_embedding_spaces(models: list) -> (torch.Tensor, list):
+    from transformers.models.auto.modeling_auto import AutoModelForMaskedLM
+
+    embeddings = []
+    labels = []
+    for model in models:
+        model_instance = AutoModelForMaskedLM.from_pretrained(model)
+        model_embeddings = model_instance.get_input_embeddings().weight
+        embeddings.append(model_embeddings)
+        labels.extend([model] * model_embeddings.size(0))
+    return torch.cat(embeddings, dim=0), models, labels

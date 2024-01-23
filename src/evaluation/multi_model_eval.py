@@ -1,17 +1,14 @@
 import argparse
-from simple_parsing import parse_known_args
-from transformers import AutoTokenizer
-from lightning import Trainer, seed_everything
+from lightning import seed_everything
 import csv
+
+from utils import get_model_names_from_numbers, create_trainer_etc
+
 import sys
 from os import path
 
 sys.path.append(path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
-from src.evaluation.utils import get_model_names_from_numbers  # noqa: E402
 from src.training.model import BasicLM  # noqa: E402
-from src.training.data_loading import LMDataModule  # noqa: E402
-from args import TrainingArgs # noqa: E402
-
 
 
 def arg_parser():
@@ -30,41 +27,12 @@ def main():
     args = arg_parser()
     # We want to validate the modle on each of the 25 models
     model_names = get_model_names_from_numbers(range(25))
-    tokenizer = AutoTokenizer.from_pretrained(model_names[0], use_fast=True)
+    model_args, dm, trainer = create_trainer_etc(args.config, model_names[0], args.accelerator, args.prompt_length)
+    model_args["local_soft_prompt"] = f"logs/explainable-soft-prompts/{args.soft_prompt_name}/checkpoints/soft_prompt.pt"
     val_losses = []
     for model_name in model_names:
-        training_args, __ = parse_known_args(TrainingArgs, config_path=args.config)
-        model_args = dict(
-            model_names_or_paths=[model_name],
-            tokenizer=tokenizer,
-            from_scratch=training_args.from_scratch,
-            learning_rate=training_args.learning_rate,
-            weight_decay=training_args.weight_decay,
-            beta1=training_args.beta1,
-            beta2=training_args.beta2,
-            lr_schedule=training_args.lr_schedule,
-            warmup_period=training_args.warmup_period,
-            prompt_length=training_args.prompt_length,
-            init_text=training_args.init_text,
-            init_embedding_models=training_args.init_embedding_models,
-            init_embedding_mode=training_args.init_embedding_mode,
-            init_seed=training_args.init_seed,
-            local_soft_prompt=f"logs/explainable-soft-prompts/{args.soft_prompt_name}/checkpoints/soft_prompt.pt",
-        )
+        model_args["model_names_or_paths"] = [model_name]
         model = BasicLM(**model_args)
-
-        dm = LMDataModule(training_args=training_args, tokenizer=tokenizer, prompt_length=args.prompt_length)
-
-        trainer = Trainer(
-            max_epochs=training_args.training_goal,
-            devices=training_args.num_devices,
-            accelerator=args.accelerator,
-            strategy=training_args.distributed_strategy,
-            deterministic=training_args.force_deterministic,
-            precision=training_args.precision,
-            gradient_clip_val=training_args.grad_clip,
-            inference_mode=not training_args.compile,  # inference_mode for val/test and PyTorch 2.0 compiler don't like each other
-        )
 
         print(f"Validating {args.soft_prompt_name} on {model_name}")
         val_losses.append(trainer.validate(model, dm)[0]["val/loss"])

@@ -89,7 +89,7 @@ def compare(
     print(
         f"Comparing soft prompts: {soft_prompt_names} and init text: {init_text}, with the distance metric {distance_metric}, on the models {tokenizer_names}. Pre averaging is {pre_averaging}."
     )
-    soft_prompt_list, __ = create_soft_prompts(soft_prompt_names, prompt_length, embedding_size)
+    soft_prompt_list, __ = create_soft_prompts(soft_prompt_names)
 
     # Creates the initial soft prompt if specified
     if init_text is not None:
