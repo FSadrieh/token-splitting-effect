@@ -3,7 +3,7 @@ import csv
 from os import path
 import sys
 
-from utils import create_init_text, create_soft_prompts, get_model_names_from_numbers, load_init_text
+from utils import create_init_text, load_soft_prompt_weights, get_model_names_from_numbers, load_init_text
 
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 from similarity_calculation import calculate_sim  # noqa: E402
@@ -38,11 +38,10 @@ def arg_parser():
         "-pa",
         "--pre_averaging",
         action="store_true",
-        help="If set the similarity is calculated between the average of the prompt tokens of each prompt. Does not make sense to use with euclidean similarity.",
+        help="If set the similarity is calculated between the average of the prompt tokens of each prompt.",
     )
-    # TODO: Should we remove euclidean similarity?
     parser.add_argument(
-        "-d", "--distance_metric", type=str, default="euclidean", help="Supports: euclidean_sim, euclidean, cosine"
+        "-d", "--distance_metric", type=str, default="euclidean", help="Supports: euclidean, cosine"
     )
     parser.add_argument(
         "-sbpt",
@@ -60,8 +59,8 @@ def main():
     args = arg_parser()
     soft_prompt_names = args.soft_prompt_names.split(",")
     tokenizer_names = get_model_names_from_numbers(args.model_numbers.split(",")) if args.model_numbers is not None else None
-    if args.distance_metric not in ["euclidean_sim", "euclidean", "cosine"]:
-        raise ValueError("The distance metric must be euclidean_sim, euclidean or cosine")
+    if args.distance_metric not in ["euclidean", "cosine"]:
+        raise ValueError("The distance metric must be euclidean or cosine")
     compare(
         soft_prompt_names,
         tokenizer_names,
@@ -89,7 +88,7 @@ def compare(
     print(
         f"Comparing soft prompts: {soft_prompt_names} and init text: {init_text}, with the distance metric {distance_metric}, on the models {tokenizer_names}. Pre averaging is {pre_averaging}."
     )
-    soft_prompt_list, __ = create_soft_prompts(soft_prompt_names)
+    soft_prompt_list, __ = load_soft_prompt_weights(soft_prompt_names)
 
     # Creates the initial soft prompt if specified
     if init_text is not None:

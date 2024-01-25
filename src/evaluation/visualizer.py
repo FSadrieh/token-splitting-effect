@@ -13,7 +13,7 @@ import umap
 from matplotlib import pyplot as plt
 
 from utils import (
-    create_soft_prompts,
+    load_soft_prompt_weights,
     create_init_text,
     get_model_names_from_numbers,
     load_init_text,
@@ -143,7 +143,7 @@ def plot_embedding_space(
 def prepare_soft_prompts(
     soft_prompt_names: list, prompt_length: int, embedding_size: int, is_avg: bool
 ) -> (torch.Tensor, list, int):
-    soft_prompt_list, labels = create_soft_prompts(soft_prompt_names)
+    soft_prompt_list, labels = load_soft_prompt_weights(soft_prompt_names)
     if is_avg:
         soft_prompt_list = [torch.mean(soft_prompt, dim=0) for soft_prompt in soft_prompt_list]
         prompt_length = 1
@@ -196,7 +196,7 @@ def visualize(
         soft_prompts = torch.cat([soft_prompts, init_text], dim=0)
         soft_prompt_names.append(init_text_name)
 
-    embeddings, model_names, model_labels = get_model_embedding_spaces(model_names)
+    embeddings, model_labels = get_model_embedding_spaces(model_names, label_type="model_name")
     embedding_space = torch.cat([embeddings, soft_prompts], dim=0).detach().numpy()
 
     reduced_embedding_space = reduce_embedding_space(embedding_space, method=method)

@@ -17,10 +17,9 @@ def calculate_sim(
 
         1. and 3. are presented in the Paper: "SPoT: Better Frozen Model Adaptation through Soft Prompt Transfer" https://aclanthology.org/2022.acl-long.346/
 
-    There are 3 distance metrics:
+    There are 2 distance metrics:
         1. Cosine similarity
-        2. Euclidean similarity: Taking the euclidean distance and then normalizing it to be between 0 and 1
-        3. Euclidean distance
+        2. Euclidean distance
     """
 
     n = soft_prompt_1.shape[0]
@@ -51,11 +50,6 @@ def calculate_sim(
         for i in range(n):
             for j in range(n):
                 distance[i, j] = torch.nn.functional.pairwise_distance(soft_prompt_1[i], soft_prompt_2[j], p=2)
-
-    # Eucledian similarity is the euclidean distance normalized to be between 0 and 1. It does not make sense to use it with pre-averaging
-    if distance_metric == "euclidean_sim" and not pre_averaging:
-        max_distance = torch.max(distance)
-        distance = 1 - (distance / max_distance)
 
     if not pre_averaging:
         return torch.mean(distance).item()

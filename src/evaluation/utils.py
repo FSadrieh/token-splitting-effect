@@ -1,8 +1,8 @@
+from typing import List
 import torch
 from simple_parsing import parse_known_args
 from transformers import AutoTokenizer
-from lightning import Trainer
-from typing import List
+from lightning import Trainer, seed_everything
 
 import sys
 from os import path
@@ -53,7 +53,7 @@ def load_init_text(soft_prompt_name: str) -> (torch.Tensor, str):
     return torch.load(init_text_path), f"init text of {soft_prompt_name}"
 
 
-def create_soft_prompt(soft_prompt_name: str) -> torch.Tensor:
+def load_soft_prompt_weight(soft_prompt_name: str) -> torch.Tensor:
     """
     This method extracts the soft prompt weight from the saved soft prompt state dict.
     """
@@ -61,11 +61,11 @@ def create_soft_prompt(soft_prompt_name: str) -> torch.Tensor:
     return torch.load(soft_prompt_path)["weight"]
 
 
-def create_soft_prompts(soft_prompt_names: list) -> list:
+def load_soft_prompt_weights(soft_prompt_names: list) -> list:
     soft_prompt_list = []
     labels = []
     for soft_prompt_name in soft_prompt_names:
-        soft_prompt = create_soft_prompt(soft_prompt_name)
+        soft_prompt = load_soft_prompt_weight(soft_prompt_name)
         # print(f"Soft prompt shape: {soft_prompt.shape}")
         soft_prompt_list.append(soft_prompt)
         labels.extend([soft_prompt_name] * soft_prompt.size(0))
@@ -77,6 +77,7 @@ def get_model_names_from_numbers(model_numbers: list) -> list:
 
 
 def create_trainer_etc(config: str, model_for_tokenizer: str, accelerator: str, prompt_length: int):
+    seed_everything(workers=True, seed=42)
     training_args, __ = parse_known_args(TrainingArgs, config_path=config)
 
     tokenizer = AutoTokenizer.from_pretrained(model_for_tokenizer, use_fast=True)
@@ -90,7 +91,7 @@ def create_trainer_etc(config: str, model_for_tokenizer: str, accelerator: str, 
         beta2=training_args.beta2,
         lr_schedule=training_args.lr_schedule,
         warmup_period=training_args.warmup_period,
-        prompt_length=training_args.prompt_length,
+        prompt_length=prompt_length,
         init_text=training_args.init_text,
         init_embedding_models=training_args.init_embedding_models,
         init_embedding_mode=training_args.init_embedding_mode,
@@ -113,7 +114,7 @@ def create_trainer_etc(config: str, model_for_tokenizer: str, accelerator: str, 
     return model_args, dm, trainer
 
 
-def get_model_embedding_spaces(models: list) -> (torch.Tensor, list):
+def get_model_embedding_spaces(models: list, label_type: str) -> (torch.Tensor, list):
     from transformers.models.auto.modeling_auto import AutoModelForMaskedLM
 
     embeddings = []
@@ -122,5 +123,29 @@ def get_model_embedding_spaces(models: list) -> (torch.Tensor, list):
         model_instance = AutoModelForMaskedLM.from_pretrained(model)
         model_embeddings = model_instance.get_input_embeddings().weight
         embeddings.append(model_embeddings)
-        labels.extend([model] * model_embeddings.size(0))
-    return torch.cat(embeddings, dim=0), models, labels
+        if label_type == "model_name":
+            labels.extend([model] * model_embeddings.size(0))
+        elif label_type == "model_number":
+            labels.extend([int(model.split("_")[-1])] * model_embeddings.size(0))
+        else:
+            raise ValueError(f"Unknown label type: {label_type}")
+    return torch.cat(embeddings, dim=0), labels
+
+
+def get_k_nearest_neighbors(
+    distance_metric: str, soft_prompt_token: torch.Tensor, embeddings: torch.Tensor, k: int
+) -> List[int]:
+    if distance_metric == "cosine":
+        similarity = torch.nn.functional.cosine_similarity(soft_prompt_token, embeddings, dim=-1)
+        return torch.argsort(similarity, descending=True)[:k].tolist()
+    else:
+        distance = torch.linalg.vector_norm(embeddings - soft_prompt_token, dim=-1, ord=2)
+        return torch.argsort(distance, descending=False)[:k].tolist()
+
+
+def get_k_nearest_neighbors_for_all_tokens(
+    distance_metric: str, soft_prompt: torch.Tensor, embeddings: torch.Tensor, k: int
+) -> List[List[int]]:
+    if k == 1:
+        return [get_k_nearest_neighbors(distance_metric, soft_prompt[i], embeddings, k)[0] for i in range(soft_prompt.size(0))]
+    return [get_k_nearest_neighbors(distance_metric, soft_prompt[i], embeddings, k) for i in range(soft_prompt.size(0))]

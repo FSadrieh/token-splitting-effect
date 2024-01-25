@@ -3,7 +3,7 @@ import torch
 from transformers.models.auto.modeling_auto import AutoModelForMaskedLM
 from transformers import AutoTokenizer
 
-from utils import create_soft_prompt, get_model_names_from_numbers, load_init_text
+from utils import load_soft_prompt_weight, get_model_names_from_numbers, load_init_text, get_k_nearest_neighbors_for_all_tokens
 
 
 def arg_parser():
@@ -40,20 +40,13 @@ def back_translation(
         soft_prompt, __ = load_init_text(soft_prompt_name)
     else:
         print(f"Back translation for {soft_prompt_name} on {model_names}, with the distance metric {distance_metric}.")
-        soft_prompt = create_soft_prompt(soft_prompt_name)
+        soft_prompt = load_soft_prompt_weight(soft_prompt_name)
 
     for model_name in model_names:
         model = AutoModelForMaskedLM.from_pretrained(model_name)
         embeddings = model.get_input_embeddings().weight
 
-        tokens = []
-        for i in range(soft_prompt.shape[0]):
-            if distance_metric == "cosine":
-                similarity = torch.nn.functional.cosine_similarity(soft_prompt[i], embeddings, dim=-1)
-                tokens.append(torch.argmax(similarity).item())
-            else:
-                distance = torch.linalg.vector_norm(embeddings - soft_prompt[i], dim=-1, ord=2)
-                tokens.append(torch.argmin(distance).item())
+        tokens = get_k_nearest_neighbors_for_all_tokens(distance_metric, soft_prompt, embeddings, k=1)
 
         tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
         detokenized_tokens = [tokenizer.decode(torch.tensor(token)) for token in tokens]

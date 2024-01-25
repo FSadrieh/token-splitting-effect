@@ -3,7 +3,7 @@ import torch
 from pathlib import Path
 import os
 
-from utils import create_soft_prompt, load_init_text
+from utils import load_soft_prompt_weight, load_init_text
 
 DEFAULT_SAVE_DIR = Path("logs/explainable-soft-prompts/")
 
@@ -44,17 +44,17 @@ def main():
     if args.use_initial_prompt == 1:
         print(f"Computing: (inital prompt of {soft_prompt_name1}) {args.operator} {soft_prompt_name2}.")
         soft_prompt1, __ = load_init_text(soft_prompt_name1)
-        soft_prompt2 = create_soft_prompt(soft_prompt_name2)
+        soft_prompt2 = load_soft_prompt_weight(soft_prompt_name2)
         soft_prompt_name1 = f"init_{soft_prompt_name1}"
     elif args.use_initial_prompt == 2:
         print(f"Computing: {soft_prompt_name1} {args.operator} (inital prompt of {soft_prompt_name2}).")
-        soft_prompt1 = create_soft_prompt(soft_prompt_name1)
+        soft_prompt1 = load_soft_prompt_weight(soft_prompt_name1)
         soft_prompt2, __ = load_init_text(soft_prompt_name2)
         soft_prompt_name2 = f"init_{soft_prompt_name2}"
     else:
         print(f"Computing {soft_prompt_name1} {args.operator} {soft_prompt_name2}.")
-        soft_prompt1 = create_soft_prompt(soft_prompt_name1)
-        soft_prompt2 = create_soft_prompt(soft_prompt_name2)
+        soft_prompt1 = load_soft_prompt_weight(soft_prompt_name1)
+        soft_prompt2 = load_soft_prompt_weight(soft_prompt_name2)
 
     result = prompt_algebra(soft_prompt1, soft_prompt2, args.operator)
 
