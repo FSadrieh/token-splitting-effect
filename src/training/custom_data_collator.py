@@ -5,8 +5,9 @@ import torch
 class CustomDataCollator(DataCollatorForWholeWordMask):
     """We use the DataCollatorForLanguageModeling from transformers but do not want to pad the input_ids. Therefore, this class overrides the torch_call function."""
 
-    def __init__(self, tokenizer):
+    def __init__(self, tokenizer, max_length):
         super().__init__(tokenizer=tokenizer)
+        self.max_length = max_length
 
     def torch_call(self, examples: list):
         """The torch_call function gets:
@@ -14,8 +15,12 @@ class CustomDataCollator(DataCollatorForWholeWordMask):
         It converts these examples to a batch with a masked token at the end."""
 
         scalar_labels = torch.stack([torch.tensor(example["label"]) for example in examples])
-        input_ids = torch.stack([torch.tensor(example["input_ids"]) for example in examples])
-        attention_mask = torch.stack([torch.tensor(example["attention_mask"]) for example in examples])
+        max_len = max(len(example["input_ids"]) for example in examples)
+        # Since we add a mask token at the end we can increase the max_len by one, if it fits into the model.
+        if max_len < self.max_length:
+            max_len += 1
+        input_ids = torch.stack([torch.cat((torch.tensor(example["input_ids"]), (torch.ones(max_len - len(example["input_ids"]), dtype=torch.long) * self.tokenizer.pad_token_id)))  for example in examples])
+        attention_mask = torch.stack([torch.cat((torch.tensor(example["attention_mask"]), torch.zeros(max_len - len(example["attention_mask"]), dtype=torch.long)))  for example in examples])
 
         labels = torch.ones_like(input_ids) * -100
 

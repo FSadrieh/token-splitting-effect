@@ -76,7 +76,7 @@ class LMDataModule(L.LightningDataModule):
         processed_datasets = datasets.load_from_disk(cache_path)
 
         # Initialize data collator for batching and padding
-        data_collator = CustomDataCollator(self.tokenizer)
+        data_collator = CustomDataCollator(self.tokenizer, self.max_length)
 
         # Assign datasets and data collator for training and validation
         self.train_dataset = processed_datasets["train"]
@@ -224,7 +224,6 @@ def make_tokenize_function(tokenizer, max_seq_length, data_dir):
         tokenized = tokenizer(
             examples["text"],
             max_length=max_seq_length,
-            padding=True,
             truncation=True,
         )
 
