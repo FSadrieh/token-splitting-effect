@@ -78,15 +78,10 @@ def main(is_sweep=None, config_path=None):
     # Logging arguments if the current process is the primary one
     if current_process_rank == 0:
         logger.info(args)
-    # Handling run names and appending IDs for W&B UI recognition
+    # Handling run names
     if current_process_rank == 0 and not args.resume and not args.offline:
         if args.run_name is None:
             logger.warning("No run name specified with `--run_name`. Using W&B default (randomly generated name).")
-        else:
-            assert wandb_logger.version is not None
-            wandb_logger.experiment.name = (
-                args.run_name + "-" + wandb_logger.version
-            )  # Append id to name for easier recognition in W&B UI
     # SLURM: cluster management and job scheduling system
     IS_ON_SLURM = SLURMEnvironment.detect()
     if IS_ON_SLURM and current_process_rank == 0:
@@ -150,6 +145,7 @@ def main(is_sweep=None, config_path=None):
     lr_monitor = LearningRateMonitor(logging_interval="step")
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(cleanup_local=True, cleanup_online=False, size_limit=20)
     checkpoint_callback = ModelCheckpoint(
+        dirpath=f"logs/explainable-soft-prompts/{args.run_name}/checkpoints/",
         filename="snap-{step}-samples-{progress/samples}-{progress/tokens}-loss-{val/loss:.2f}",
         monitor="val/loss",
         mode="min",

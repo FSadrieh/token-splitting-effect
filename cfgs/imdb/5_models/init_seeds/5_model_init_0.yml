@@ -14,3 +14,4 @@ init_seed: 5653572532
 learning_rate: 0.8111074872795443
 batch_size: 168
 val_before_training: False
+run_name: 5_model_init_0

@@ -14,3 +14,4 @@ init_seed: 8943168
 learning_rate: 0.12845108642567576
 batch_size: 180
 val_before_training: False
+run_name: emotion_5_model_init_1
