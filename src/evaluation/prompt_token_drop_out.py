@@ -1,7 +1,7 @@
 import argparse
 import csv
 import torch
-from typing import List
+from typing import List, Tuple
 import numpy as np
 
 from utils import get_model_names_from_numbers, create_trainer_etc, load_soft_prompt_weight
@@ -21,34 +21,38 @@ def arg_parser():
     parser.add_argument("-a", "--accelerator", type=str, default="cuda", help="Supports: cuda, cpu, tpu, mps")
     parser.add_argument("-p", "--prompt_length", type=int, default=16)
     parser.add_argument("-e", "--embedding_size", type=int, default=768)
+    parser.add_argument("-b", "--batch_size", type=int, default=128)
     return parser.parse_args()
 
 
 def main():
     args = arg_parser()
-    model_per_token = prompt_token_drop_out(
-        args.model_numbers,
-        args.config,
-        args.soft_prompt_name,
-        args.accelerator,
-        args.prompt_length,
-        args.embedding_size,
-    )
+    model_per_token = prompt_token_drop_out(**args)
     print(model_per_token)
 
 
 def prompt_token_drop_out(
-    model_numbers: str,
-    config: str,
     soft_prompt_name: str,
+    model_numbers: List[int],
+    config: str,
     accelerator: str,
     prompt_length: int,
     embedding_size: int,
-) -> List[int]:
+    batch_size: int,
+) -> Tuple[List[int], List[float]]:
+    # Check if we have saved the losses already
+    try:
+        losses = np.genfromtxt(f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/{'_'.join(model_numbers)}_token_drop_out.csv", delimiter=",", skip_header=1)[:, 1:]
+        models = [np.argmax(losses[:, i]) for i in range(prompt_length)]
+        model_losses = [losses[models[i], i] for i in range(prompt_length)]
+        return models, model_losses
+    except FileNotFoundError:
+        pass
+    
     model_names = get_model_names_from_numbers(model_numbers.split(","))
 
     weights = create_soft_prompt_weights(soft_prompt_name, prompt_length, embedding_size)
-    model_args, dm, trainer = create_trainer_etc(config, model_names[0], accelerator, prompt_length)
+    model_args, dm, trainer = create_trainer_etc(config, model_names[0], accelerator, prompt_length, batch_size)
 
     val_losses = {}
     # We validate for each model and each weight
@@ -71,7 +75,9 @@ def prompt_token_drop_out(
             writer.writerow([model_names[i]] + [val_losses[(model_names[i], j)] for j in range(len(weights))])
 
     # We return the model with the highest loss for each token
-    return [np.argmax([val_losses[(model_names[j], i)] for j in range(len(model_names))]) for i in range(len(weights))]
+    models = [np.argmax([val_losses[(model_names[j], i)] for j in range(len(model_names))]) for i in range(len(weights))]
+    losses = [val_losses[(model_names[models[i]], i)] for i in range(len(weights))]
+    return models, losses
 
 
 def create_soft_prompt_weights(soft_prompt_name: str, prompt_length: int, embedding_size: int) -> List[torch.nn.Parameter]:

@@ -75,8 +75,11 @@ def load_soft_prompt_weights(soft_prompt_names: list) -> list:
 def get_model_names_from_numbers(model_numbers: list) -> list:
     return [f"google/multiberts-seed_{model_number}" for model_number in model_numbers]
 
+def get_model_numbers_from_names(model_names: list) -> list:
+    return [model_name.split("_")[-1] for model_name in model_names]
 
-def create_trainer_etc(config: str, model_for_tokenizer: str, accelerator: str, prompt_length: int):
+
+def create_trainer_etc(config: str, model_for_tokenizer: str, accelerator: str, prompt_length: int, batch_size: int):
     seed_everything(workers=True, seed=42)
     training_args, __ = parse_known_args(TrainingArgs, config_path=config)
 
@@ -98,6 +101,7 @@ def create_trainer_etc(config: str, model_for_tokenizer: str, accelerator: str, 
         init_seed=training_args.init_seed,
     )
 
+    training_args["batch_size"] = batch_size
     dm = LMDataModule(training_args=training_args, tokenizer=tokenizer, prompt_length=prompt_length)
 
     trainer = Trainer(
