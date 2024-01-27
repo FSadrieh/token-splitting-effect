@@ -1,7 +1,6 @@
 data/*
 visualizations/*
 similarities/*
-cfgs/*
 checkpoints/*
 !data/mock/
 data/mock/tokenized/*
