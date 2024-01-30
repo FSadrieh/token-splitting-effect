@@ -1,4 +1,5 @@
-python dlib/data/data_download.py emotion -o data
+#!/bin/bash
+python dlib/data/data_download.py --dataset emotion -o data
 
 python train.py --config cfgs/emotion/5_models/models/emotion_5_model_0.yml
 python train.py --config cfgs/emotion/5_models/models/emotion_5_model_1.yml
