@@ -1,4 +1,7 @@
 data/*
+visualizations/*
+similarities/*
+checkpoints/*
 !data/mock/
 data/mock/tokenized/*
 logs/

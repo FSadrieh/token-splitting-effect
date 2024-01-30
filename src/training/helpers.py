@@ -96,7 +96,6 @@ class ProgressMetricCallback(Callback):
         batch_idx: int,
         dataloader_idx: int = 0,
     ) -> None:
-
         self.log_dict(
             {
                 "progress/samples": self.samples_processed,

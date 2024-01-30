@@ -78,7 +78,7 @@ def main(args: Args):
         # Disable caching because we write the end result to disk anyways. Intermediary caches just clutter the disk!
         logger.info("Disabling caching to conserve disk space.")
         datasets.fingerprint.disable_caching()
-        
+
     output_dir = os.path.join(args.out_dir, args.dataset)
 
     os.makedirs(output_dir, exist_ok=True)
@@ -119,7 +119,6 @@ def main(args: Args):
             streaming=args.stream,
             num_proc=None if args.stream else args.processes,
         )
-
 
     ##### Split into train/dev/test #####
     logger.info("Shuffling and splitting into sets...")
@@ -174,7 +173,6 @@ def main(args: Args):
             with jsonlines.Writer(test_fp, compact=True) as writer:
                 writer.write_all(test_paragraphs)
             test_fp.close()
-
 
     logger.success("Done! Enjoy your data :)")
     logger.print(output_dir / "train.jsonl")

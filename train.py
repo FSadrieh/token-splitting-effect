@@ -9,27 +9,34 @@ from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.loggers.wandb import WandbLogger
 from lightning.pytorch.plugins.environments import LightningEnvironment, SLURMEnvironment
 from print_on_steroids import graceful_exceptions, logger
-from simple_parsing import parse
+from simple_parsing import parse, parse_known_args
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
 from args import TrainingArgs
 from dlib import CUDAMetricsCallback, WandbCleanupDiskAndCloudSpaceCallback, get_rank, log_slurm_info, wait_for_debugger
-from src.data_loading import LMDataModule
-from src.helpers import (
+from src.training.data_loading import LMDataModule
+from src.training.helpers import (
     ProgressMetricCallback,
     check_checkpoint_path_for_wandb,
     check_for_wandb_checkpoint_and_download_if_necessary,
 )
-from src.model import BasicLM
+from src.training.model import BasicLM
 
 WANDB_PROJECT = "explainable-soft-prompts"
 WANDB_ENTITY = "raphael-team"
 
 
-def main(args: TrainingArgs):
+def main(is_sweep=None, config_path=None):
     # Checking CUDA device availability and setup
     # "Rank" is the ID of the process in a distributed SLURM evironment, Rank 0 is main process
+
     current_process_rank = get_rank()
+    if is_sweep:
+        wandb.init()
+        args, __ = parse_known_args(TrainingArgs, config_path=config_path)
+        args.update_from_dict(wandb.config)
+    else:
+        args = parse(TrainingArgs, add_config_path_arg=True)
     logger.config(rank=current_process_rank, print_rank0_only=True)
     if args.accelerator == "cuda":
         num_available_gpus = torch.cuda.device_count()
@@ -51,12 +58,12 @@ def main(args: TrainingArgs):
     if args.offline or args.fast_dev_run or args.data_preprocessing_only:
         os.environ["WANDB_MODE"] = "dryrun"
     wandb_extra_args = dict(name=args.run_name)
-    
+
     # Resume training from W&B checkpoint if necessary
     if args.saved_checkpoint_path and args.resume and check_checkpoint_path_for_wandb(args.saved_checkpoint_path):
         logger.info("Resuming training from W&B")
-        wandb_extra_args = dict(id=check_checkpoint_path_for_wandb(args.saved_checkpoint_path), resume="must") # resume W&B run
-    
+        wandb_extra_args = dict(id=check_checkpoint_path_for_wandb(args.saved_checkpoint_path), resume="must")  # resume W&B run
+
     # Initializing the W&B logger with project and entity details
     wandb_logger = WandbLogger(
         project=WANDB_PROJECT,
@@ -71,15 +78,10 @@ def main(args: TrainingArgs):
     # Logging arguments if the current process is the primary one
     if current_process_rank == 0:
         logger.info(args)
-    # Handling run names and appending IDs for W&B UI recognition
+    # Handling run names
     if current_process_rank == 0 and not args.resume and not args.offline:
         if args.run_name is None:
             logger.warning("No run name specified with `--run_name`. Using W&B default (randomly generated name).")
-        else:
-            assert wandb_logger.version is not None
-            wandb_logger.experiment.name = (
-                args.run_name + "-" + wandb_logger.version
-            )  # Append id to name for easier recognition in W&B UI
     # SLURM: cluster management and job scheduling system
     IS_ON_SLURM = SLURMEnvironment.detect()
     if IS_ON_SLURM and current_process_rank == 0:
@@ -87,7 +89,9 @@ def main(args: TrainingArgs):
 
     ################# Construct model ##############
 
-    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(args.tokenizer_path or args.hf_model_names[0], use_fast=True)
+    tokenizer: PreTrainedTokenizerFast = AutoTokenizer.from_pretrained(
+        args.tokenizer_path or args.hf_model_names[0], use_fast=True
+    )
     # Resume from checkpoint if specified
     model_args = dict(
         model_names_or_paths=args.hf_model_names,
@@ -103,6 +107,7 @@ def main(args: TrainingArgs):
         init_text=args.init_text,
         init_embedding_models=args.init_embedding_models,
         init_embedding_mode=args.init_embedding_mode,
+        init_seed=args.init_seed,
     )
     if args.saved_checkpoint_path:
         args.saved_checkpoint_path = check_for_wandb_checkpoint_and_download_if_necessary(
@@ -140,6 +145,7 @@ def main(args: TrainingArgs):
     lr_monitor = LearningRateMonitor(logging_interval="step")
     wandb_disk_cleanup_callback = WandbCleanupDiskAndCloudSpaceCallback(cleanup_local=True, cleanup_online=False, size_limit=20)
     checkpoint_callback = ModelCheckpoint(
+        dirpath=f"logs/explainable-soft-prompts/{args.run_name}/checkpoints/",
         filename="snap-{step}-samples-{progress/samples}-{progress/tokens}-loss-{val/loss:.2f}",
         monitor="val/loss",
         mode="min",
@@ -210,6 +216,7 @@ def main(args: TrainingArgs):
             save_dir = Path(checkpoint_callback.dirpath)
             os.makedirs(save_dir, exist_ok=True)
             torch.save(model.soft_prompt.state_dict(), save_dir / "soft_prompt.pt")
+            torch.save(model.init_soft_prompt, save_dir / "init_soft_prompt.pt")
 
             logger.info("Collecting PL checkpoint for wandb...")
             artifact = wandb.Artifact(name=f"model-{wandb_logger.experiment.id}", type="model")
@@ -220,10 +227,12 @@ def main(args: TrainingArgs):
             wandb_logger.experiment.log_artifact(artifact, aliases=aliases)
 
             logger.success("Saving finished!")
+            logger.info(
+                f"The soft prompt can be found at: {save_dir / 'soft_prompt.pt'}. Specify {str(save_dir).split('/')[-2]} in the evaluation scripts, to load the soft prompt."
+            )
 
 
 if __name__ == "__main__":
-    parsed_arg_groups = parse(TrainingArgs, add_config_path_arg=True)
     current_process_rank = get_rank()
     with graceful_exceptions(extra_message=f"Rank: {current_process_rank}"):
-        main(parsed_arg_groups)
+        main()

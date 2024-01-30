@@ -13,9 +13,9 @@ class TrainingArgs:
     Argument class for use with simple_parsing that handles the basics of most LLM training scripts. Subclass this to add more arguments.
     """
 
-    data_dir: Path = field(alias="-d")
-    
-    hf_model_names: list[str] = list_field(default=["google/multiberts-seed_1"], alias="--models")
+    data_dir: Path = field(alias="-d", default="data/imdb")
+
+    hf_model_names: list[str] = list_field(alias="--models")
     "HuggingFace model identifier. This is used to construct the model architecture and load pretrained weights if not specified otherwise."
 
     from_scratch: bool = field(default=False)
@@ -25,9 +25,6 @@ class TrainingArgs:
     "Path to a saved pytorch-lightning checkpoint. Use the wandb:<wandb-run-id> syntax to load a checkpoint from W&B."
 
     resume: bool = False
-
-    training_objective: Literal["mlm", "clm", "classification"] = field(default="classification")
-    "Whether to train a masked language model, a causal language model, or a classification model."
 
     train_file: str = field(default="train.jsonl")
     "Name of the training file."
@@ -42,7 +39,7 @@ class TrainingArgs:
     ##### Training constants ######
     ###############################
 
-    training_goal: int = field(default=10)
+    training_goal: int = field(default=5)
     "Number of epochs to run."
 
     save_interval: int | float = field(default=0.1)
@@ -61,7 +58,7 @@ class TrainingArgs:
     "The sequence length of samples."
 
     learning_rate: float = field(default=3e-4)
-    batch_size: int = field(default=256, alias="-b")
+    batch_size: int = field(default=160, alias="-b")
     weight_decay: float = 0.1
     beta1: float = 0.9
     beta2: float = 0.95
@@ -85,7 +82,7 @@ class TrainingArgs:
         help="Distributed training strategy to use. If `auto`, will select automatically (no distributed strategy is used when using a single device).",
         aliases="--ds",
     )
-    micro_batch_size: int = field(default=None, alias="--mb")
+    micro_batch_size: int = field(default=32, alias="--mb")
     """If None, use batch_size // num_devices. This is the batch size per device, not the total batch size.
     You should tune this so that you do not get GPU RAM OOM errors. We automatically calculate the gradient accumulation steps to achieve your desired `batch_size`."""
 
@@ -114,7 +111,7 @@ class TrainingArgs:
     run_name: str = field(default=None, alias="-n")
     "Run name for logging."
 
-    seed: int | None = field(default=None)
+    seed: int = field(default=42)
 
     only_val: bool = field(default=False)
     "Only run validation."
@@ -143,7 +140,7 @@ class TrainingArgs:
     ###### Explainable Soft Prompts specific args ######
     ####################################################
 
-    prompt_length: int = field(default=30)
+    prompt_length: int = field(default=16)
     "Length of soft prompt to be trained."
 
     init_text: str = field(default=None)
@@ -152,8 +149,11 @@ class TrainingArgs:
     init_embedding_models: str = field(default=None)
     "Models to be used for soft prompt initialization. Specify a comma-seperated list. If None the first model from `hf_model_names` will be used."
 
-    init_embedding_mode: Literal["normal", "average", "mix"] = field(default="mean")
+    init_embedding_mode: Literal["normal", "average", "mix"] = field(default="normal")
     "Will only be used if init_embedding_models is used. Normal will use the first model, average will average the embeddings of all models, mix will cut the embeddings into equal parts and embedd each part with a different model."
+
+    init_seed: int = field(default=0)
+    "Seed to be used for soft prompt initialization. Will only be used if no init text is specified."
 
     def __post_init__(self):
         assert self.num_devices > 0
@@ -173,11 +173,11 @@ class TrainingArgs:
         elif self.lr_decay_period < 1:
             self.lr_decay_period = int(self.lr_decay_period * self.training_goal)
 
-        assert self.batch_size % self.micro_batch_size == 0
+        # assert self.batch_size % self.micro_batch_size == 0
         if self.gradient_accumulation_steps == -1:
             self.gradient_accumulation_steps = self.batch_size // self.iter_batch_size
         assert self.gradient_accumulation_steps > 0
-        assert self.batch_size == self.micro_batch_size * self.num_devices * self.gradient_accumulation_steps
+        # assert self.batch_size == self.micro_batch_size * self.num_devices * self.gradient_accumulation_steps
 
         if self.tokenizer_path is None:
             self.tokenizer_path = self.hf_model_names[0]
@@ -189,3 +189,8 @@ class TrainingArgs:
         if self.preprocessing_workers == -1:
             # Set to all available CPUs, handle SLURM case when only some CPUs are available to the job
             self.preprocessing_workers = int(os.environ.get("SLURM_JOB_CPUS_PER_NODE", multiprocessing.cpu_count()))
+
+    def update_from_dict(self, values_dict):
+        # Update class variables with values from the dictionary
+        for key, value in values_dict.items():
+            setattr(self, key, value)

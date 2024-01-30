@@ -28,6 +28,7 @@ dependencies:
   - scipy
   - pandas
   - seqeval
+  - matplotlib
   # - scikit-learn # scikit-learn makes problems fo osx-arm64 - we don't need it anyways
 
   # Misc

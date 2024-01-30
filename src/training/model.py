@@ -3,12 +3,19 @@ import torch
 import math
 from print_on_steroids import logger
 from torch.optim import AdamW
+from torchmetrics import Accuracy
 from transformers import PreTrainedTokenizerFast
 from transformers.modeling_utils import PreTrainedModel
 from transformers.models.auto.configuration_auto import AutoConfig
 from transformers.models.auto.modeling_auto import AutoModelForMaskedLM
 from transformers.optimization import get_scheduler
 from warmup_scheduler import GradualWarmupScheduler
+
+import sys
+from os import path
+
+sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
+from similarity_calculation import calculate_sim  # noqa: E402
 
 
 # Define a basic Language Model using PyTorch Lightning
@@ -25,23 +32,24 @@ class BasicLM(L.LightningModule):
         lr_schedule: str,
         warmup_period: int,
         prompt_length: int,
+        init_embedding_mode: str,
         epsilon: float = 1e-8,
+        init_seed: int = 42,
         save_hyperparameters: bool = True,
-        local_soft_prompt: str | None = None,
+        local_soft_prompt: str = None,
         init_text: str | None = None,
         init_embedding_models: str | None = None,
-        init_embedding_mode: str,
     ) -> None:
         # Initialize the LightningModule
         super().__init__()
         if save_hyperparameters:
             self.save_hyperparameters(ignore=["save_hyperparameters"])
-        
+
         self.models = []
         for model_name_or_path in model_names_or_paths:
             if model_name_or_path is None:
                 raise ValueError("model_name_or_path cannot be None")
-            
+
             # Load configuration and initialize the first transformer model
             config = AutoConfig.from_pretrained(model_name_or_path, return_dict=True)
             model: PreTrainedModel = (
@@ -49,10 +57,10 @@ class BasicLM(L.LightningModule):
                 if not from_scratch
                 else AutoModelForMaskedLM.from_config(config=config)
             )
-            
+
             for param in model.parameters():
                 param.requires_grad = False
-            
+
             self.models.append(model)
 
         self.model = self.models[0]
@@ -67,7 +75,7 @@ class BasicLM(L.LightningModule):
             self.soft_prompt.load_state_dict(torch.load(local_soft_prompt))
         else:
             if init_text:
-                init_ids = tokenizer(init_text)["input_ids"]
+                init_ids = tokenizer(init_text, add_special_tokens=False)["input_ids"]
                 if len(init_ids) > prompt_length:
                     init_ids = init_ids[:prompt_length]
                 elif len(init_ids) < prompt_length:
@@ -81,20 +89,42 @@ class BasicLM(L.LightningModule):
                         init_embeddings.append(init_model.get_input_embeddings())
 
                     if init_embedding_mode == "average":
-                        prompt_token_weights = torch.mean(torch.stack([embedding(torch.LongTensor(init_ids)).detach().clone() for embedding in init_embeddings]), dim=0)
+                        prompt_token_weights = torch.mean(
+                            torch.stack(
+                                [embedding(torch.LongTensor(init_ids)).detach().clone() for embedding in init_embeddings]
+                            ),
+                            dim=0,
+                        )
                     elif init_embedding_mode == "mix":
                         parts = len(init_embeddings)
                         part_length = prompt_length // parts
                         init_parts = []
-                        for part in range(parts-1):
+                        for part in range(parts - 1):
                             init_parts.append(init_ids[part * part_length : (part + 1) * part_length])
                         init_parts.append(init_ids[(parts - 1) * part_length :])
-                        prompt_token_weights = torch.cat([embedding(torch.LongTensor(init_part)).detach().clone() for init_part, embedding in zip(init_parts, init_embeddings)], dim=0)
+                        prompt_token_weights = torch.cat(
+                            [
+                                embedding(torch.LongTensor(init_part)).detach().clone()
+                                for init_part, embedding in zip(init_parts, init_embeddings)
+                            ],
+                            dim=0,
+                        )
                 else:
-                    init_model = AutoModelForMaskedLM.from_pretrained(init_embedding_models.split(",")[0]) if init_embedding_models else self.model
+                    init_model = (
+                        AutoModelForMaskedLM.from_pretrained(init_embedding_models.split(",")[0])
+                        if init_embedding_models
+                        else self.model
+                    )
                     embedding = init_model.get_input_embeddings()
                     prompt_token_weights = embedding(torch.LongTensor(init_ids)).detach().clone()
                 self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
+
+            else:
+                seed = torch.random.get_rng_state()
+                self.soft_prompt.weight = torch.nn.Parameter(
+                    torch.randn(prompt_length, embedding_size, generator=torch.random.manual_seed(init_seed)).to(torch.float32)
+                )
+                torch.random.set_rng_state(seed)
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
@@ -104,25 +134,30 @@ class BasicLM(L.LightningModule):
         self.warmup_period = warmup_period
         self.epsilon = epsilon
         self.tokenizer = tokenizer
+        self.prompt_length = prompt_length
 
+        self.init_soft_prompt = self.soft_prompt(self.prompt_tokens).detach().clone()
+
+    def set_soft_prompt_weight(self, soft_prompt_weight: torch.nn.Parameter):
+        self.soft_prompt.weight = soft_prompt_weight
 
     def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
         prompt = self.soft_prompt(self.prompt_tokens.to(self.device)).unsqueeze(0).expand(input_ids.shape[0], -1, -1)
-        
+
         # Adjust attention mask for the concatenated prompt
         attention_mask = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device), attention_mask], dim=1)
         labels = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device) * -100, labels], dim=1).long()
-        
+
         outputs = []
         for model in self.models:
             model.to(self.device)
             embedded_input = model.get_input_embeddings()(input_ids)
-        
+
             # Generate prompt embeddings and concatenate with input embeddings
             inputs_embeds = torch.cat([prompt, embedded_input], dim=1)
-            
+
             outputs.append(model(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels))
-        
+
         return outputs
 
     def training_step(self, batch, batch_idx):
@@ -137,6 +172,36 @@ class BasicLM(L.LightningModule):
         outputs = self(**batch)
         loss = torch.stack([output.loss for output in outputs]).mean()
         self.log("val/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        current_soft_prompt = self.soft_prompt(self.prompt_tokens.to(self.device))
+        initial_soft_prompt = self.init_soft_prompt.to(self.device)
+        self.log(
+            "val/distance_to_init",
+            calculate_sim(current_soft_prompt, initial_soft_prompt, "euclidean", pre_averaging=False),
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+        )
+        self.log(
+            "val/distance_to_init_on_avg_prompt",
+            calculate_sim(current_soft_prompt, initial_soft_prompt, "euclidean", pre_averaging=True),
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+        )
+        self.log(
+            "val/sim_to_init",
+            calculate_sim(current_soft_prompt, initial_soft_prompt, "cosine", pre_averaging=False),
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+        )
+        self.log(
+            "val/sim_to_init_on_avg_prompt",
+            calculate_sim(current_soft_prompt, initial_soft_prompt, "cosine", pre_averaging=True),
+            on_step=False,
+            on_epoch=True,
+            sync_dist=True,
+        )
 
     def configure_optimizers(self):
         # Configure the optimizers and learning rate schedulers
@@ -191,7 +256,12 @@ class BasicLM(L.LightningModule):
                 scheduler_name,
                 optimizer,
                 num_warmup_steps=int(self.warmup_period),
-                num_training_steps=self.trainer.max_steps if self.trainer.max_steps != -1 else int(int(len(self.trainer.train_dataloader) / int(self.trainer.accumulate_grad_batches)) * self.trainer.max_epochs),
+                num_training_steps=self.trainer.max_steps
+                if self.trainer.max_steps != -1
+                else int(
+                    int(len(self.trainer.train_dataloader) / int(self.trainer.accumulate_grad_batches))
+                    * self.trainer.max_epochs
+                ),
             )
             scheduler_config = {"frequency": 1}
 
