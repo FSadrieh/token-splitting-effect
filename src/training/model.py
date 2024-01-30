@@ -137,7 +137,6 @@ class BasicLM(L.LightningModule):
         self.prompt_length = prompt_length
 
         self.init_soft_prompt = self.soft_prompt(self.prompt_tokens).detach().clone()
-        self.accuracy = Accuracy("multiclass", num_classes=tokenizer.vocab_size).to(self.device)
 
     def set_soft_prompt_weight(self, soft_prompt_weight: torch.nn.Parameter):
         self.soft_prompt.weight = soft_prompt_weight
@@ -203,10 +202,6 @@ class BasicLM(L.LightningModule):
             on_epoch=True,
             sync_dist=True,
         )
-        # Log accuracy
-        logits = torch.stack([output.logits for output in outputs]).mean(dim=0)
-        preds = logits.reshape(-1, logits.shape[-1])
-        self.log("val/accuracy", self.accuracy(preds, batch["labels"].view(-1)), on_step=False, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):
         # Configure the optimizers and learning rate schedulers

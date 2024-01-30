@@ -1,4 +1,4 @@
-training_goal: 5
+training_goal: 15
 save_interval: 0.1
 warmup_period: 0.03951068869784255
 weight_decay: 0.17270324640937235

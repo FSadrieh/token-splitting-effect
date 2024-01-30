@@ -40,9 +40,7 @@ def arg_parser():
         action="store_true",
         help="If set the similarity is calculated between the average of the prompt tokens of each prompt.",
     )
-    parser.add_argument(
-        "-d", "--distance_metric", type=str, default="euclidean", help="Supports: euclidean, cosine"
-    )
+    parser.add_argument("-d", "--distance_metric", type=str, default="euclidean", help="Supports: euclidean, cosine")
     parser.add_argument(
         "-sbpt",
         "--similarity_between_prompt_tokens",

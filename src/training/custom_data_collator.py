@@ -19,8 +19,28 @@ class CustomDataCollator(DataCollatorForWholeWordMask):
         # Since we add a mask token at the end we can increase the max_len by one, if it fits into the model.
         if max_len < self.max_length:
             max_len += 1
-        input_ids = torch.stack([torch.cat((torch.tensor(example["input_ids"]), (torch.ones(max_len - len(example["input_ids"]), dtype=torch.long) * self.tokenizer.pad_token_id)))  for example in examples])
-        attention_mask = torch.stack([torch.cat((torch.tensor(example["attention_mask"]), torch.zeros(max_len - len(example["attention_mask"]), dtype=torch.long)))  for example in examples])
+        input_ids = torch.stack(
+            [
+                torch.cat(
+                    (
+                        torch.tensor(example["input_ids"]),
+                        (torch.ones(max_len - len(example["input_ids"]), dtype=torch.long) * self.tokenizer.pad_token_id),
+                    )
+                )
+                for example in examples
+            ]
+        )
+        attention_mask = torch.stack(
+            [
+                torch.cat(
+                    (
+                        torch.tensor(example["attention_mask"]),
+                        torch.zeros(max_len - len(example["attention_mask"]), dtype=torch.long),
+                    )
+                )
+                for example in examples
+            ]
+        )
 
         labels = torch.ones_like(input_ids) * -100
 

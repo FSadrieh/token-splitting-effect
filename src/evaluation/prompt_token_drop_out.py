@@ -42,14 +42,19 @@ def prompt_token_drop_out(
 ) -> Tuple[List[int], List[float]]:
     # Check if we have saved the losses already
     try:
-        losses = np.genfromtxt(f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/{'_'.join(model_numbers)}_token_drop_out.csv", delimiter=",", skip_header=1)[:, 1:]
+        losses = np.genfromtxt(
+            f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/{'_'.join(model_numbers)}_token_drop_out.csv",
+            delimiter=",",
+            skip_header=1,
+        )[:, 1:]
         models = [np.argmax(losses[:, i]) for i in range(prompt_length)]
-        model_losses = [losses[models[i], i] for i in range(prompt_length)]
-        return models, model_losses
+        best_model_numbers = [int(model_numbers[model]) for model in models]
+        model_losses = [float(losses[models[i], i]) for i in range(prompt_length)]
+        return best_model_numbers, model_losses
     except FileNotFoundError:
         pass
-    
-    model_names = get_model_names_from_numbers(model_numbers.split(","))
+
+    model_names = get_model_names_from_numbers(model_numbers)
 
     weights = create_soft_prompt_weights(soft_prompt_name, prompt_length, embedding_size)
     model_args, dm, trainer = create_trainer_etc(config, model_names[0], accelerator, prompt_length, batch_size)
@@ -66,7 +71,7 @@ def prompt_token_drop_out(
 
     # We save all losses in a csv file at the location of the soft prompt
     with open(
-        f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/{model_numbers.replace(',','_')}_token_drop_out.csv",
+        f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/{'_'.join(model_numbers)}_token_drop_out.csv",
         "w+",
     ) as f:
         writer = csv.writer(f)
@@ -76,8 +81,9 @@ def prompt_token_drop_out(
 
     # We return the model with the highest loss for each token
     models = [np.argmax([val_losses[(model_names[j], i)] for j in range(len(model_names))]) for i in range(len(weights))]
-    losses = [val_losses[(model_names[models[i]], i)] for i in range(len(weights))]
-    return models, losses
+    best_model_numbers = [int(model_numbers[model]) for model in models]
+    losses = [float(val_losses[(model_names[models[i]], i)]) for i in range(len(weights))]
+    return best_model_numbers, losses
 
 
 def create_soft_prompt_weights(soft_prompt_name: str, prompt_length: int, embedding_size: int) -> List[torch.nn.Parameter]:
