@@ -16,7 +16,7 @@ def check_for_wandb_checkpoint_and_download_if_necessary(
     wandb_run_instance,
     wandb_entity=None,
     wandb_project=None,
-    suffix="/model.ckpt",
+    suffix="/soft_prompt.pt",
 ) -> str:
     from train import WANDB_ENTITY, WANDB_PROJECT
 
