@@ -1,3 +1,4 @@
+data_dir: data/emotion
 training_goal: 15
 save_interval: 0.1
 warmup_period: 0.03951068869784255
