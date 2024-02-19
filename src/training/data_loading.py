@@ -244,12 +244,23 @@ def make_tokenize_function(tokenizer, max_seq_length, data_dir):
                     for x in examples["label"]
                 ]
             )
-        else:
+        elif "imdb" in data_dir.name:
             scalar_labels = torch.tensor(
                 [
                     tokenizer("negative", add_special_tokens=False)["input_ids"][0]
                     if x == 0
                     else tokenizer("positive", add_special_tokens=False)["input_ids"][0]
+                    for x in examples["label"]
+                ]
+            )
+        elif "mnli" in data_dir.name:
+            scalar_labels = torch.tensor(
+                [
+                    tokenizer("entailment", add_special_tokens=False)["input_ids"][0] # Note this will only put the token 4372 ("en") with the bert tokenizer as a label. This does not matter since it is still distinguishable from the other labels.
+                    if x == 0
+                    else tokenizer("neutral", add_special_tokens=False)["input_ids"][0]
+                    if x == 1
+                    else tokenizer("contradiction", add_special_tokens=False)["input_ids"][0]
                     for x in examples["label"]
                 ]
             )

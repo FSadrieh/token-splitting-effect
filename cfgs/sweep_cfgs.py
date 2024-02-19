@@ -19,7 +19,7 @@ sweep_cfgs = {
             "batch_size": {"min": 128, "max": 512},
         },
     },
-    "emotion_sweep": {
+    "other_dataset_sweeps": {
         "method": "bayes",
         "metric": {"name": "val/loss", "goal": "minimize"},
         "parameters": {

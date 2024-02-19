@@ -31,7 +31,7 @@ class Args:
     out_dir: str = field(alias="-o")
     "Path to data directory."
 
-    dataset: Literal["glue_sst2", "imdb", "emotion"] = field(default="imdb")
+    dataset: Literal["imdb", "emotion", "glue_mnli"] = field(default="imdb")
     "HF dataset. Pile currently uses a mirror with copyrighted material removed."
 
     max_train_size: int = field(default=50_000_000)
@@ -99,18 +99,6 @@ def main(args: Args):
             num_proc=None if args.stream else args.processes,
         )
         print(dataset)
-    elif args.dataset == "glue_sst2":
-        dataset = load_dataset(
-            "glue",
-            "sst2",
-            split=args.split,
-            cache_dir=tmp_cache_dir,
-            streaming=args.stream,
-            num_proc=None if args.stream else args.processes,
-        )
-        dataset = dataset.rename_column("sentence", "text")
-        dataset = dataset.remove_columns(["idx"])
-        print(dataset)
     elif args.dataset == "emotion":
         dataset = load_dataset(
             "dair-ai/emotion",
@@ -119,6 +107,19 @@ def main(args: Args):
             streaming=args.stream,
             num_proc=None if args.stream else args.processes,
         )
+    elif args.dataset == "glue_mnli":
+        dataset = load_dataset(
+            "glue",
+            "mnli",
+            split=args.split,
+            cache_dir=tmp_cache_dir,
+            streaming=args.stream,
+            num_proc=None if args.stream else args.processes,
+        )
+        
+        dataset = dataset.map(lambda x: {"text": x["premise"] + ";" + x["hypothesis"]})
+        dataset = dataset.remove_columns(["idx", "premise", "hypothesis"])
+        print(dataset)
 
     ##### Split into train/dev/test #####
     logger.info("Shuffling and splitting into sets...")

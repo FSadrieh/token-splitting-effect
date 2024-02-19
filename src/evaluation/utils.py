@@ -77,7 +77,7 @@ def get_model_names_from_numbers(model_numbers: list) -> list:
 
 
 def get_model_numbers_from_names(model_names: list) -> list:
-    return [model_name.split("_")[-1] for model_name in model_names]
+    return [int(model_name.split("_")[-1]) for model_name in model_names]
 
 
 def create_trainer_etc(config: str, model_for_tokenizer: str, accelerator: str, prompt_length: int, batch_size: int):
@@ -103,6 +103,7 @@ def create_trainer_etc(config: str, model_for_tokenizer: str, accelerator: str, 
     )
 
     training_args.eval_micro_batch_size = batch_size
+    training_args.batch_size = batch_size
     dm = LMDataModule(training_args=training_args, tokenizer=tokenizer, prompt_length=prompt_length)
 
     trainer = Trainer(
