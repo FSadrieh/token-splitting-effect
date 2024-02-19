@@ -31,7 +31,7 @@ class Args:
     out_dir: str = field(alias="-o")
     "Path to data directory."
 
-    dataset: Literal["imdb", "emotion", "glue_mnli"] = field(default="imdb")
+    dataset: Literal["imdb", "emotion", "mnli"] = field(default="imdb")
     "HF dataset. Pile currently uses a mirror with copyrighted material removed."
 
     max_train_size: int = field(default=50_000_000)
@@ -107,7 +107,7 @@ def main(args: Args):
             streaming=args.stream,
             num_proc=None if args.stream else args.processes,
         )
-    elif args.dataset == "glue_mnli":
+    elif args.dataset == "mnli":
         dataset = load_dataset(
             "glue",
             "mnli",
