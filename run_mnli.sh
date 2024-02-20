@@ -18,6 +18,6 @@ python train.py --config cfgs/mnli/5_models/train_seeds/mnli_5_model_train_1.yml
 python train.py --config cfgs/mnli/5_models/train_seeds/mnli_5_model_train_2.yml
 
 #10 models
-python train.py --config cfgs/mnli/10_models/mnli_10_model_0.yml
-python train.py --config cfgs/mnli/10_models/mnli_10_model_1.yml
-python train.py --config cfgs/mnli/10_models/mnli_10_model_2.yml
+# python train.py --config cfgs/mnli/10_models/mnli_10_model_0.yml
+# python train.py --config cfgs/mnli/10_models/mnli_10_model_1.yml
+# python train.py --config cfgs/mnli/10_models/mnli_10_model_2.yml
