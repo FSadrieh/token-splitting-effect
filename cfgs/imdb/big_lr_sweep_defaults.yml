@@ -1,0 +1,14 @@
+training_goal: 5
+save_interval: 0.1
+warmup_period: 0.03951068869784255
+weight_decay: 0.17270324640937235
+beta1: 0.8034042221205476
+beta2: 0.9388980921327073
+hf_model_names: ["google/multiberts-seed_0"]
+precision: bf16-mixed
+micro_batch_size: 32
+seed: 42
+prompt_length: 16
+# init_text: "Classify the sentiment of this movie review with 'positive' or 'negative':"
+learning_rate: 0.8111074872795443
+batch_size: 168

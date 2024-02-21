@@ -17,21 +17,21 @@ import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Literal
+from typing import Literal
 
 import datasets
 import jsonlines
 from datasets import load_dataset
 from print_on_steroids import graceful_exceptions, logger
 from simple_parsing import field, parse
-from tqdm import tqdm
 
 
 @dataclass
 class Args:
     out_dir: str = field(alias="-o")
+    "Path to data directory."
 
-    dataset: Literal["glue_sst2", "imdb"] = field(default="imdb")
+    dataset: Literal["imdb", "emotion", "mnli"] = field(default="imdb")
     "HF dataset. Pile currently uses a mirror with copyrighted material removed."
 
     max_train_size: int = field(default=50_000_000)
@@ -79,12 +79,14 @@ def main(args: Args):
         logger.info("Disabling caching to conserve disk space.")
         datasets.fingerprint.disable_caching()
 
-    os.makedirs(args.out_dir, exist_ok=True)
+    output_dir = os.path.join(args.out_dir, args.dataset)
+
+    os.makedirs(output_dir, exist_ok=True)
     logger.info("Downloading dataset. This can take some time, so sit back and relax...")
 
     tmp_cache_dir = None
     if args.conserve_disk_space:
-        tmp_cache_dir = os.path.join(args.out_dir, args.language, "tmp_download_cache")
+        tmp_cache_dir = os.path.join(output_dir, args.language, "tmp_download_cache")
         os.makedirs(tmp_cache_dir, exist_ok=True)
 
     ##### Load dataset #####
@@ -97,17 +99,27 @@ def main(args: Args):
             num_proc=None if args.stream else args.processes,
         )
         print(dataset)
-    elif args.dataset == "glue_sst2":
+    elif args.dataset == "emotion":
         dataset = load_dataset(
-            "glue",
-            "sst2",
+            "dair-ai/emotion",
             split=args.split,
             cache_dir=tmp_cache_dir,
             streaming=args.stream,
             num_proc=None if args.stream else args.processes,
         )
+    elif args.dataset == "mnli":
+        dataset = load_dataset(
+            "glue",
+            "mnli",
+            split=args.split,
+            cache_dir=tmp_cache_dir,
+            streaming=args.stream,
+            num_proc=None if args.stream else args.processes,
+        )
+        
+        dataset = dataset.map(lambda x: {"text": x["premise"] + ";" + x["hypothesis"]})
+        dataset = dataset.remove_columns(["idx", "premise", "hypothesis"])
         print(dataset)
-
 
     ##### Split into train/dev/test #####
     logger.info("Shuffling and splitting into sets...")
@@ -140,7 +152,7 @@ def main(args: Args):
 
     ##### Write to disk #####
     logger.info("Writing data...")
-    output_dir = Path(args.out_dir)
+    output_dir = Path(output_dir)
     os.makedirs(str(output_dir), exist_ok=True)
     PERFORMANT_BUFFER_SIZE_BYTES = 1024 * 1024 * 100  # 100 MB
 
@@ -162,7 +174,6 @@ def main(args: Args):
             with jsonlines.Writer(test_fp, compact=True) as writer:
                 writer.write_all(test_paragraphs)
             test_fp.close()
-
 
     logger.success("Done! Enjoy your data :)")
     logger.print(output_dir / "train.jsonl")
