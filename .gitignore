@@ -148,3 +148,5 @@ dmypy.json
 dev_cuda.yml
 dev.yml
 .vscode
+
+cache.pickle
