@@ -7,7 +7,7 @@ beta1: 0.8034042221205476
 beta2: 0.9388980921327073
 hf_model_names: ["google/multiberts-seed_10", "google/multiberts-seed_11", "google/multiberts-seed_12", "google/multiberts-seed_13", "google/multiberts-seed_14", "google/multiberts-seed_15", "google/multiberts-seed_16", "google/multiberts-seed_17", "google/multiberts-seed_18", "google/multiberts-seed_19"]
 precision: bf16-mixed
-micro_batch_size: 8
+micro_batch_size: 4
 seed: 42
 prompt_length: 16
 init_seed: 5653572532

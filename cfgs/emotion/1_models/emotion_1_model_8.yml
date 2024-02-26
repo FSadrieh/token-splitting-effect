@@ -1,0 +1,17 @@
+batch_size: 180
+beta1: 0.8034042221205476
+beta2: 0.9388980921327073
+data_dir: data/emotion
+hf_model_names: ["google/multiberts-seed_8"]
+init_seed: 5653572532
+learning_rate: 0.12845108642567576
+micro_batch_size: 128
+precision: bf16-mixed
+prompt_length: 16
+run_name: emotion_1_model_8
+save_interval: 0.1
+seed: 42
+training_goal: 15
+val_before_training: false
+warmup_period: 0.03951068869784255
+weight_decay: 0.17270324640937235

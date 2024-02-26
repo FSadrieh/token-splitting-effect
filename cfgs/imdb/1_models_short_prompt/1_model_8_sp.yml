@@ -1,0 +1,16 @@
+batch_size: 168
+beta1: 0.8034042221205476
+beta2: 0.9388980921327073
+hf_model_names: ["google/multiberts-seed_8"]
+init_seed: 5653572532
+learning_rate: 0.8111074872795443
+micro_batch_size: 32
+precision: bf16-mixed
+prompt_length: 2
+run_name: 1_model_8_sp
+save_interval: 0.1
+seed: 42
+training_goal: 5
+val_before_training: false
+warmup_period: 0.03951068869784255
+weight_decay: 0.17270324640937235
