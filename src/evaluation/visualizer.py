@@ -220,7 +220,7 @@ def plot_embedding_space(
         )
         if label in prompts:
             for i, (x, y) in enumerate(zip(embedding_space[indices, 0], embedding_space[indices, 1])):
-                ax.annotate(f"{i}", (x, y), fontsize=16, weight="bold",  xytext=(x + generate_random_float(5 * scale_x, 10 * scale_x), y + generate_random_float(5 * scale_y, 10 * scale_y)), arrowprops=dict(arrowstyle="->", connectionstyle=f"arc3, rad={generate_random_float(0.1, 0.4)}"), color=label_to_color[label])
+                ax.annotate(f"{i}", (x, y), fontsize=16, weight="bold",  xytext=(x + generate_random_float(5 * scale_x, 10 * scale_x), y + generate_random_float(5 * scale_y, 10 * scale_y)), arrowprops=dict(arrowstyle="->", connectionstyle=f"arc3, rad={generate_random_float(0.1, 0.4)}", facecolor=label_to_color[label], color=label_to_color[label]), color=label_to_color[label])
 
     # Improving legend visibility
     legend = ax.legend(loc='best', fontsize='small', fancybox=True)
