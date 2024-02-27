@@ -38,6 +38,10 @@ def prompt_algebra(prompt_1: torch.Tensor, prompt_2: torch.Tensor, operator: str
 
 
 def main():
+    """
+    This script is used to perform algebraic operations on soft prompts. This is not reported in the paper and does not work well.
+    We do not recommend using this script.
+    """
     args = arg_parser()
     soft_prompt_name1 = args.soft_prompt_name1
     soft_prompt_name2 = args.soft_prompt_name2
