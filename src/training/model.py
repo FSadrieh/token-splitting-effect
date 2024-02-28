@@ -3,7 +3,6 @@ import torch
 import math
 from print_on_steroids import logger
 from torch.optim import AdamW
-from torchmetrics import Accuracy
 from transformers import PreTrainedTokenizerFast
 from transformers.modeling_utils import PreTrainedModel
 from transformers.models.auto.configuration_auto import AutoConfig
@@ -58,11 +57,13 @@ class BasicLM(L.LightningModule):
                 else AutoModelForMaskedLM.from_config(config=config)
             )
 
+            # Since we only want to train the SPs we freeze all model parameters
             for param in model.parameters():
                 param.requires_grad = False
 
             self.models.append(model)
 
+        # For some functions we need a concrete model, so we just take the first one
         self.model = self.models[0]
 
         # Initialize a prompt embedding layer
@@ -74,6 +75,7 @@ class BasicLM(L.LightningModule):
         if local_soft_prompt:
             self.soft_prompt.load_state_dict(torch.load(local_soft_prompt))
         else:
+            # Init text was not used in the paper, but has been shown to perform well in some cases. We do not recommend using it!
             if init_text:
                 init_ids = tokenizer(init_text, add_special_tokens=False)["input_ids"]
                 if len(init_ids) > prompt_length:
@@ -120,6 +122,7 @@ class BasicLM(L.LightningModule):
                 self.soft_prompt.weight = torch.nn.Parameter(prompt_token_weights.to(torch.float32))
 
             else:
+                # This was the default in the paper
                 seed = torch.random.get_rng_state()
                 self.soft_prompt.weight = torch.nn.Parameter(
                     torch.randn(prompt_length, embedding_size, generator=torch.random.manual_seed(init_seed)).to(torch.float32)
@@ -136,18 +139,21 @@ class BasicLM(L.LightningModule):
         self.tokenizer = tokenizer
         self.prompt_length = prompt_length
 
+        # We save the initial soft prompt to calculate the distance to it and to save it in the end
         self.init_soft_prompt = self.soft_prompt(self.prompt_tokens).detach().clone()
 
     def set_soft_prompt_weight(self, soft_prompt_weight: torch.nn.Parameter):
         self.soft_prompt.weight = soft_prompt_weight
 
     def forward(self, input_ids, attention_mask, labels, token_type_ids=None):
+        # We need to broadcast the prompt to the batch size
         prompt = self.soft_prompt(self.prompt_tokens.to(self.device)).unsqueeze(0).expand(input_ids.shape[0], -1, -1)
 
         # Adjust attention mask for the concatenated prompt
         attention_mask = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device), attention_mask], dim=1)
         labels = torch.cat([torch.ones(prompt.shape[0], prompt.shape[1]).to(self.device) * -100, labels], dim=1).long()
 
+        # For each model we calculate the loss and return them in a list
         outputs = []
         for model in self.models:
             model.to(self.device)
@@ -163,6 +169,7 @@ class BasicLM(L.LightningModule):
     def training_step(self, batch, batch_idx):
         # Perform a training step
         outputs = self(**batch)
+        # Here we take the list of model outputs and mean the losses
         loss = torch.stack([output.loss for output in outputs]).mean()
         self.log("train/loss", loss, on_step=True, on_epoch=True)
         return loss
@@ -174,6 +181,7 @@ class BasicLM(L.LightningModule):
         self.log("val/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
         current_soft_prompt = self.soft_prompt(self.prompt_tokens.to(self.device))
         initial_soft_prompt = self.init_soft_prompt.to(self.device)
+        # These are four of the six similarity metrics out of similarity_calculation.py. We use them to monitor the distance to the initial soft prompt. These results are not used in the paper.
         self.log(
             "val/distance_to_init",
             calculate_sim(current_soft_prompt, initial_soft_prompt, "euclidean", pre_averaging=False),
@@ -202,6 +210,11 @@ class BasicLM(L.LightningModule):
             on_epoch=True,
             sync_dist=True,
         )
+
+    def test_step(self, batch, batch_idx):
+        outputs = self(**batch)
+        loss = torch.stack([output.loss for output in outputs]).mean()
+        self.log("test/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
 
     def configure_optimizers(self):
         # Configure the optimizers and learning rate schedulers
