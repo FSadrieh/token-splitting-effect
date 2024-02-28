@@ -10,7 +10,6 @@ from typing import Union
 
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
-import umap
 
 from matplotlib import pyplot as plt
 import matplotlib
@@ -73,7 +72,7 @@ def arg_parser():
     parser.add_argument(
         "--method",
         type=str,
-        default="umap",
+        default="tsne",
         help="Method to use for dimensionality reduction, choose between 'umap' and 'tsne'.",
     )
     return parser.parse_args()
@@ -87,6 +86,7 @@ def reduce_embedding_space(embedding_space: torch.Tensor, n_components: int = 50
     print(f"PCA took {time.time() - start} seconds.")
 
     if method == "umap":
+        import umap
         start = time.time()
         mapper = umap.UMAP(metric="cosine", n_neighbors=30, n_jobs=-1).fit(reduced_embedding_space)
         result = mapper.transform(reduced_embedding_space)
