@@ -15,7 +15,7 @@ The recommended usage is:
 ```bash
 bash ./scripts/run-in-docker.sh -g <wanted-gpus> bash
 ```
-3. Run which ever result you want to reproduce using <code>scripts</code> folder.
+3. Run the right script for which ever result you want to reproduce using <code>scripts</code> folder.
 
 
 <details><summary>NLP research template</summary>
