@@ -33,15 +33,17 @@ class LMDataModule(L.LightningDataModule):
         super().__init__()
         self.args = training_args
         self.data_dir = training_args.data_dir
-        train_file, val_file = (
+        train_file, val_file, test_file = (
             self.data_dir / self.args.train_file,
             self.data_dir / self.args.val_file,
+            self.data_dir / self.args.test_file,
         )
 
-        logger.debug(f"Train file path: {train_file} val file path: {val_file}")
+        logger.debug(f"Train file path: {train_file} val file path: {val_file} test file path: {test_file}")
 
         self.train_file = str(train_file)
         self.val_file = str(val_file)
+        self.test_file = str(test_file)
         self.tokenizer_path = self.args.tokenizer_path or self.args.hf_model_names[0]
         self.local_rank = get_rank()
 
@@ -81,6 +83,7 @@ class LMDataModule(L.LightningDataModule):
         # Assign datasets and data collator for training and validation
         self.train_dataset = processed_datasets["train"]
         self.val_dataset = processed_datasets["val"]
+        self.test_dataset = processed_datasets["test"]
         self.data_collator = data_collator
 
     def load_and_process_dataset(self, tokenizer, tokenized_data_dir):
@@ -92,7 +95,7 @@ class LMDataModule(L.LightningDataModule):
             extension = "json"
 
         # Define paths for training and validation data files
-        data_files = {"train": self.train_file, "val": self.val_file}
+        data_files = {"train": self.train_file, "val": self.val_file, "test": self.test_file}
 
         logger.info("Loading raw dataset...")
 
@@ -175,6 +178,17 @@ class LMDataModule(L.LightningDataModule):
         )
         return DataLoader(self.val_dataset, collate_fn=self.data_collator, **common_args)
 
+    def test_dataloader(self):
+        common_args = dict(
+            batch_size=self.args.eval_micro_batch_size,
+            num_workers=self.args.workers,
+            persistent_workers=(
+                True if self.args.workers > 0 else False
+            ),  # https://discuss.pytorch.org/t/what-are-the-dis-advantages-of-persistent-workers/102110/10
+            pin_memory=True,
+        )
+        return DataLoader(self.test_dataset, collate_fn=self.data_collator, **common_args)
+
     def _get_dataset_cache_path(self, tokenizer_name: str):
         # Generate the path for cached dataset based on tokenizer and other parameters
         tokenizer_name = Path(self.tokenizer_path).as_posix().replace("/", "_")
@@ -221,6 +235,10 @@ def make_tokenize_function(tokenizer, max_seq_length, data_dir):
 
     # Define a tokenize function for processing text data
     def tokenize_function(examples):
+        """
+        This function first tokenizes the input texst, with truncation to the maximum length.
+        Then it tokenizes the label classes and takes their first token.
+        """
         tokenized = tokenizer(
             examples["text"],
             max_length=max_seq_length,
@@ -256,7 +274,9 @@ def make_tokenize_function(tokenizer, max_seq_length, data_dir):
         elif "mnli" in data_dir.name:
             scalar_labels = torch.tensor(
                 [
-                    tokenizer("entailment", add_special_tokens=False)["input_ids"][0] # Note this will only put the token 4372 ("en") with the bert tokenizer as a label. This does not matter since it is still distinguishable from the other labels.
+                    tokenizer("entailment", add_special_tokens=False)["input_ids"][
+                        0
+                    ]  # Note this will only put the token 4372 ("en") with the bert tokenizer as a label. This does not matter since it is still distinguishable from the other labels.
                     if x == 0
                     else tokenizer("neutral", add_special_tokens=False)["input_ids"][0]
                     if x == 1

@@ -4,7 +4,7 @@ similarities/*
 checkpoints/*
 !data/mock/
 data/mock/tokenized/*
-logs/
+logs/wandb
 # experiment output logs
 wandb/
 artifacts/

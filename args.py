@@ -32,6 +32,9 @@ class TrainingArgs:
     val_file: str = field(default="dev.jsonl")
     "Name of the validation file."
 
+    test_file: str = field(default="test.jsonl")
+    "Name of the test file."
+
     tokenizer_path: str | None = field(default=None)
     "Path to a saved tokenizer to switch the vocabulary. If None, use the hf_model_name."
 
@@ -143,6 +146,10 @@ class TrainingArgs:
     prompt_length: int = field(default=16)
     "Length of soft prompt to be trained."
 
+    init_seed: int = field(default=0)
+    "Seed to be used for soft prompt initialization. Will only be used if no init text is specified."
+
+    # All of the following fields were not used in the paper and are only relevant if you want to use text to initialization the SP.
     init_text: str = field(default=None)
     "Initial text to be used for soft prompt initialization."
 
@@ -151,9 +158,6 @@ class TrainingArgs:
 
     init_embedding_mode: Literal["normal", "average", "mix"] = field(default="normal")
     "Will only be used if init_embedding_models is used. Normal will use the first model, average will average the embeddings of all models, mix will cut the embeddings into equal parts and embedd each part with a different model."
-
-    init_seed: int = field(default=0)
-    "Seed to be used for soft prompt initialization. Will only be used if no init text is specified."
 
     def __post_init__(self):
         assert self.num_devices > 0

@@ -116,7 +116,7 @@ def main(args: Args):
             streaming=args.stream,
             num_proc=None if args.stream else args.processes,
         )
-        
+
         dataset = dataset.map(lambda x: {"text": x["premise"] + ";" + x["hypothesis"]})
         dataset = dataset.remove_columns(["idx", "premise", "hypothesis"])
         print(dataset)

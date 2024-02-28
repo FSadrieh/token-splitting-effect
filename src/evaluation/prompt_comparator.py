@@ -3,7 +3,7 @@ import csv
 from os import path
 import sys
 
-from utils import create_init_text, load_soft_prompt_weights, get_model_names_from_numbers, load_init_text
+from utils import load_soft_prompt_weights, load_init_text
 
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 from similarity_calculation import calculate_sim  # noqa: E402
@@ -17,22 +17,13 @@ def arg_parser():
         help="Comma separated list of soft prompt names. If you do not know what soft prompt names are available check logs/explainable-soft-prompts.",
     )
     parser.add_argument(
-        "output_name", type=str, help="Path to save the plot to. The plot will be saved in the similarities folder."
+        "output_name", type=str, help="Path to save the csv to. The csv will be saved in the similarities folder."
     )
     parser.add_argument(
         "-i",
-        "--init_text",
-        type=str,
-        default=None,
-        help="If set the init text will be used in the similarity calculation. If init_text=='default' the init text from the specified soft prompt will be used.",
-    )
-    # Note it does not make a lot of sense to use the init text with soft prompts trained on other models, since the init text would be different
-    parser.add_argument(
-        "-m",
-        "--model_numbers",
-        type=str,
-        default=None,
-        help="Comma separated list of model numbers to use for init text. If not specified the models for the soft prompts will be used. Will be ignored if init_text is not set or set to 'default'.",
+        "--use_init_text",
+        action="store_true",
+        help="If set the init text will be used in the similarity calculation.",
     )
     parser.add_argument(
         "-pa",
@@ -47,8 +38,6 @@ def arg_parser():
         action="store_true",
         help="If set sim between all prompts is calculated. Otherwise, the similarity between each token of the prompts is calculated. If pre-average is set, this flag is ignored.",
     )
-    parser.add_argument("-e", "--embedding_size", type=int, default=768)
-    parser.add_argument("-p", "--prompt_length", type=int, default=16)
 
     return parser.parse_args()
 
@@ -56,17 +45,13 @@ def arg_parser():
 def main():
     args = arg_parser()
     soft_prompt_names = args.soft_prompt_names.split(",")
-    tokenizer_names = get_model_names_from_numbers(args.model_numbers.split(",")) if args.model_numbers is not None else None
     if args.distance_metric not in ["euclidean", "cosine"]:
         raise ValueError("The distance metric must be euclidean or cosine")
     compare(
         soft_prompt_names,
-        tokenizer_names,
         args.init_text,
         args.pre_averaging,
         args.distance_metric,
-        args.embedding_size,
-        args.prompt_length,
         args.output_name,
         args.similarity_between_prompt_tokens,
     )
@@ -74,36 +59,29 @@ def main():
 
 def compare(
     soft_prompt_names: list,
-    tokenizer_names: list,
-    init_text: str,
+    init_text: bool,
     pre_averaging: bool,
     distance_metric: str,
-    embedding_size: int,
-    prompt_length: int,
     output_name: str,
     similarity_between_prompt_tokens: bool,
 ):
+    """
+    compare the similarity between soft prompts. If init_text is set, the init text will also be used in the comparison. For the different similarity metrics see src/similarity_calculation.py
+    """
     print(
-        f"Comparing soft prompts: {soft_prompt_names} and init text: {init_text}, with the distance metric {distance_metric}, on the models {tokenizer_names}. Pre averaging is {pre_averaging}."
+        f"Comparing soft prompts: {soft_prompt_names} and init text: {init_text}, with the distance metric {distance_metric}. Pre averaging is {pre_averaging}."
     )
     soft_prompt_list, __ = load_soft_prompt_weights(soft_prompt_names)
 
     # Creates the initial soft prompt if specified
     if init_text is not None:
-        if init_text == "default":
-            for i in range(len(soft_prompt_names)):
-                try:
-                    init_prompt, init_name = load_init_text(soft_prompt_names[i])
-                    soft_prompt_list.append(init_prompt)
-                    soft_prompt_names.append(init_name)
-                except FileNotFoundError:
-                    print(f"Could not find the initial prompt for {soft_prompt_names[i]}")
-        else:
-            if tokenizer_names is None:
-                raise ValueError("You need to specify a tokenizer if you want to use an init text")
-            for tokenizer in tokenizer_names:
-                soft_prompt_list.append(create_init_text(init_text, tokenizer, embedding_size, prompt_length))
-                soft_prompt_names.append(f"init_{tokenizer.split('/')[-1]}")
+        for i in range(len(soft_prompt_names)):
+            try:
+                init_prompt, init_name = load_init_text(soft_prompt_names[i])
+                soft_prompt_list.append(init_prompt)
+                soft_prompt_names.append(init_name)
+            except FileNotFoundError:
+                print(f"Could not find the initial prompt for {soft_prompt_names[i]}")
 
     # If there is only one soft prompt, there is nothing to compare. (At this stage the init text is already added to the list)
     if len(soft_prompt_names) < 2:

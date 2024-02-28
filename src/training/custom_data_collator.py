@@ -19,6 +19,7 @@ class CustomDataCollator(DataCollatorForWholeWordMask):
         # Since we add a mask token at the end we can increase the max_len by one, if it fits into the model.
         if max_len < self.max_length:
             max_len += 1
+        # Here we pad the input_ids and attention_mask to the max_len
         input_ids = torch.stack(
             [
                 torch.cat(
@@ -44,10 +45,13 @@ class CustomDataCollator(DataCollatorForWholeWordMask):
 
         labels = torch.ones_like(input_ids) * -100
 
+        # Here we insert the mask token at the end of the input_ids and the label at the same position in the labels
         for i in range(input_ids.shape[0]):
+            # If the last token is not a pad token we can just insert the mask token at the end and will remove the input at that token
             if input_ids[i][-1] != self.tokenizer.pad_token_id:
                 input_ids[i][-1] = self.tokenizer.mask_token_id
                 labels[i][-1] = scalar_labels[i]
+            # Otherwise we need to find the first pad token and insert the mask token there
             else:
                 pad_index = torch.where(input_ids[i] == self.tokenizer.pad_token_id)[0][0]  # To get the first pad token index
                 input_ids[i][pad_index] = self.tokenizer.mask_token_id
