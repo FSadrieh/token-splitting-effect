@@ -40,7 +40,7 @@ def main():
     config = config_dir + soft_prompt_names[0] + ".yml"
 
     one_model_loss = []
-    model_args, trainer, dm = create_trainer_etc(
+    model_args, dm, trainer = create_trainer_etc(
         config, "google/multiberts-seed_0", args.accelerator, prompt_length, args.batch_size
     )
 

@@ -78,9 +78,9 @@ def create_report(dataset: str, k: int, batch_size: int, accelerator: str, use_t
 
     metrics = {
         "euc_accuracy": [],  # Alignment between the prompt location and prompt performance with euclidean metric
-        "euc_std": [],
+        "euc_accuracy_std": [],
         "cos_accuracy": [],  # Alignment between the prompt location and prompt performance with cosine metric
-        "cos_std": [],
+        "cos_accuracy_std": [],
         "masked_loss": [],  # Loss when the unimportant tokens are masked
         "masked_loss_std": [],
         "compressed_loss": [],  # Loss when the unimportant tokens are removed

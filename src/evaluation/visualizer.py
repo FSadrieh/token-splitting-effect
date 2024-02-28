@@ -15,7 +15,13 @@ import umap
 from matplotlib import pyplot as plt
 import matplotlib
 
-from utils import create_init_text, get_model_names_from_numbers, load_init_text, get_model_embedding_spaces, load_soft_prompt_weights
+from utils import (
+    create_init_text,
+    get_model_names_from_numbers,
+    load_init_text,
+    get_model_embedding_spaces,
+    load_soft_prompt_weights,
+)
 
 
 DEFAULT_COLORS = ["gray", "red", "blue", "orange", "green", "purple", "brown", "pink", "olive", "cyan", "black"]
@@ -114,33 +120,33 @@ def latexify(fig_width=None, fig_height=None, columns=1):
     from math import sqrt
 
     if fig_width is None:
-        fig_width = 3.39 if columns==1 else 6.9 # width in inches
-        #fig_width = 12 if columns==1 else 17 # width in inches
+        fig_width = 3.39 if columns == 1 else 6.9  # width in inches
+        # fig_width = 12 if columns==1 else 17 # width in inches
 
     if fig_height is None:
-        golden_mean = (sqrt(5)-1.0)/2.0    # Aesthetic ratio
-        fig_height = fig_width*golden_mean # height in inches
+        golden_mean = (sqrt(5) - 1.0) / 2.0  # Aesthetic ratio
+        fig_height = fig_width * golden_mean  # height in inches
 
     MAX_HEIGHT_INCHES = 8.0
     if fig_height > MAX_HEIGHT_INCHES:
-        print("WARNING: fig_height too large:" + fig_height + 
-              "so will reduce to" + MAX_HEIGHT_INCHES + "inches.")
+        print("WARNING: fig_height too large:" + fig_height + "so will reduce to" + MAX_HEIGHT_INCHES + "inches.")
         fig_height = MAX_HEIGHT_INCHES
 
-    params = {'backend': 'ps',
-              #'text.latex.preamble': ['\\usepackage{gensymb}'],
-              'axes.labelsize': 8, # fontsize for x and y labels (was 10)
-              'axes.titlesize': 8,
-              'lines.linewidth': 0.5,
-              'axes.linewidth': 0.0,
-              #'text.fontsize': 8, # was 10
-              'legend.fontsize': 8, # was 10
-              'xtick.labelsize': 8,
-              'ytick.labelsize': 8,
-              'lines.markersize': 2,
-              #'text.usetex': True,
-              'figure.figsize': [fig_width,fig_height],
-              #'font.family': 'serif'
+    params = {
+        "backend": "ps",
+        #'text.latex.preamble': ['\\usepackage{gensymb}'],
+        "axes.labelsize": 8,  # fontsize for x and y labels (was 10)
+        "axes.titlesize": 8,
+        "lines.linewidth": 0.5,
+        "axes.linewidth": 0.0,
+        #'text.fontsize': 8, # was 10
+        "legend.fontsize": 8,  # was 10
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "lines.markersize": 2,
+        #'text.usetex': True,
+        "figure.figsize": [fig_width, fig_height],
+        #'font.family': 'serif'
     }
 
     matplotlib.rcParams.update(params)
@@ -159,18 +165,18 @@ def plot_embedding_space(
     # Calculate proportional scales based on the embedding space's range
     x_min, x_max = min(embedding_space[:, 0]), max(embedding_space[:, 0])
     y_min, y_max = min(embedding_space[:, 1]), max(embedding_space[:, 1])
-    
+
     # Scale factors - adjust these as needed
     scale_x = (x_max - x_min) / 100.0
     scale_y = (y_max - y_min) / 100.0
-    
+
     # Set up the plot
     latexify()
-    fig, ax = plt.subplots() 
+    fig, ax = plt.subplots()
     plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
-    
+
     unique_labels = sorted(set(labels), reverse=True)
-    
+
     label_to_color = {label: colors[i] for i, label in enumerate(sorted(set(labels)))}
     label_to_color_light = {label: DEFAULT_COLORS_LIGHT[i] for i, label in enumerate(unique_labels)}
     label_to_color_strong = {label: DEFAULT_COLORS_STRONG[i] for i, label in enumerate(unique_labels)}
@@ -185,9 +191,9 @@ def plot_embedding_space(
                 alpha=0.5,
                 s=5,
                 color=label_to_color_strong[label],
-                label=label
+                label=label,
             )
-            for (i, (x, y)) in enumerate(zip(embedding_space[indices, 0], embedding_space[indices, 1])):
+            for i, (x, y) in enumerate(zip(embedding_space[indices, 0], embedding_space[indices, 1])):
                 ax.annotate(i, (x, y), color=label_to_color_strong[label])
         else:
             ax.scatter(
@@ -196,12 +202,12 @@ def plot_embedding_space(
                 alpha=0.01,
                 s=5,
                 color=label_to_color_light[label],
-                label=label
+                label=label,
             )
     legend = ax.legend()
-    for lh in legend.legend_handles: 
+    for lh in legend.legend_handles:
         lh.set_alpha(1)
-    fig, ax = plt.subplots(figsize=(10,8), dpi=300)
+    fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
     unique_labels = sorted(set(labels))
 
     label_to_color = {label: colors[i % len(colors)] for i, label in enumerate(unique_labels)}
@@ -211,23 +217,34 @@ def plot_embedding_space(
         indices = [i for i, l in enumerate(labels) if l == label]
         alpha = 0.5 if label in prompts else 0.008
         ax.scatter(
-            embedding_space[indices, 0],
-            embedding_space[indices, 1],
-            alpha=alpha,
-            s=5,
-            color=label_to_color[label],
-            label=label
+            embedding_space[indices, 0], embedding_space[indices, 1], alpha=alpha, s=5, color=label_to_color[label], label=label
         )
         if label in prompts:
             for i, (x, y) in enumerate(zip(embedding_space[indices, 0], embedding_space[indices, 1])):
-                ax.annotate(f"{i}", (x, y), fontsize=16, weight="bold",  xytext=(x + generate_random_float(5 * scale_x, 10 * scale_x), y + generate_random_float(5 * scale_y, 10 * scale_y)), arrowprops=dict(arrowstyle="->", connectionstyle=f"arc3, rad={generate_random_float(0.1, 0.4)}", facecolor=label_to_color[label], color=label_to_color[label]), color=label_to_color[label])
+                ax.annotate(
+                    f"{i}",
+                    (x, y),
+                    fontsize=16,
+                    weight="bold",
+                    xytext=(
+                        x + generate_random_float(5 * scale_x, 10 * scale_x),
+                        y + generate_random_float(5 * scale_y, 10 * scale_y),
+                    ),
+                    arrowprops=dict(
+                        arrowstyle="->",
+                        connectionstyle=f"arc3, rad={generate_random_float(0.1, 0.4)}",
+                        facecolor=label_to_color[label],
+                        color=label_to_color[label],
+                    ),
+                    color=label_to_color[label],
+                )
 
     # Improving legend visibility
-    legend = ax.legend(loc='best', fontsize='small', fancybox=True)
-    for lh in legend.legend_handles: 
+    legend = ax.legend(loc="best", fontsize="small", fancybox=True)
+    for lh in legend.legend_handles:
         lh.set_alpha(1)
 
-    fig.savefig(os.path.join("visualizations", output_name), bbox_inches='tight', pad_inches=0)
+    fig.savefig(os.path.join("visualizations", output_name), bbox_inches="tight", pad_inches=0)
 
 
 def prepare_soft_prompts(

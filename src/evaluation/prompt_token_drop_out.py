@@ -13,6 +13,7 @@ from os import path
 sys.path.append(path.dirname(path.dirname(path.dirname(path.abspath(__file__)))))
 from src.training.model import BasicLM  # noqa: E402
 
+
 def prompt_token_drop_out(
     soft_prompt_name: str,
     model_numbers: List[int],
@@ -68,16 +69,18 @@ def create_soft_prompt_weights(soft_prompt_name: str, prompt_length: int, embedd
         weights.append(torch.nn.Parameter(weight))
     return weights
 
+
 def read_csv(save_path, model_numbers, prompt_length):
     losses = np.genfromtxt(
-            save_path,
-            delimiter=",",
-            skip_header=1,
-        )[:, 1:]
+        save_path,
+        delimiter=",",
+        skip_header=1,
+    )[:, 1:]
     models = [np.argmax(losses[:, i]) for i in range(prompt_length)]
     best_model_numbers = [int(model_numbers[model]) for model in models]
     model_losses = [float(losses[models[i], i]) for i in range(prompt_length)]
     return best_model_numbers, model_losses
+
 
 def save_csv(save_path, model_names, weights, val_losses):
     # We save all losses in a csv file at the location of the soft prompt
@@ -108,16 +111,17 @@ def main():
     # The prompt token drop out should be used from token relevance evaluation. For debugging purposes one can use this fucntion.
     args = arg_parser()
     model_per_token = prompt_token_drop_out(
-        soft_prompt_name = args.soft_prompt_name,
-        model_numbers = args.model_numbers.split(","),
-        config = args.config,
-        accelerator = args.accelerator,
-        prompt_length= args.prompt_length,
-        embedding_size= args.embedding_size,
-        batch_size= args.batch_size,
-        use_test_set= args.use_test_set,
+        soft_prompt_name=args.soft_prompt_name,
+        model_numbers=args.model_numbers.split(","),
+        config=args.config,
+        accelerator=args.accelerator,
+        prompt_length=args.prompt_length,
+        embedding_size=args.embedding_size,
+        batch_size=args.batch_size,
+        use_test_set=args.use_test_set,
     )
     print(model_per_token)
+
 
 if __name__ == "__main__":
     main()

@@ -145,7 +145,7 @@ class TrainingArgs:
 
     prompt_length: int = field(default=16)
     "Length of soft prompt to be trained."
-    
+
     init_seed: int = field(default=0)
     "Seed to be used for soft prompt initialization. Will only be used if no init text is specified."
 
@@ -158,7 +158,6 @@ class TrainingArgs:
 
     init_embedding_mode: Literal["normal", "average", "mix"] = field(default="normal")
     "Will only be used if init_embedding_models is used. Normal will use the first model, average will average the embeddings of all models, mix will cut the embeddings into equal parts and embedd each part with a different model."
-
 
     def __post_init__(self):
         assert self.num_devices > 0

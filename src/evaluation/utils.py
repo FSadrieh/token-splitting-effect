@@ -139,7 +139,7 @@ def get_k_nearest_neighbors_for_all_tokens(
 
 
 def create_trainer_etc(
-    config: str, model_for_tokenizer: str, accelerator: str, prompt_length: int, batch_size: int
+    config: str, model_for_tokenizer: str, accelerator: str, prompt_length: int, batch_size: int = None
 ) -> Tuple[dict, LMDataModule, Trainer]:
     """
     This function creates everything that we need for a validation and test loop.
@@ -167,7 +167,9 @@ def create_trainer_etc(
         init_embedding_mode=training_args.init_embedding_mode,
         init_seed=training_args.init_seed,
     )
-
+    if batch_size:
+        training_args.eval_micro_batch_size = batch_size
+        training_args.batch_size = batch_size
     dm = LMDataModule(training_args=training_args, tokenizer=tokenizer, prompt_length=prompt_length)
 
     trainer = Trainer(
@@ -196,15 +198,16 @@ def validate_soft_prompt(
     """
     This function validates/tests a soft prompt on a model. It returns the loss.
     """
-    print(f"Validating model {model_number}")
     seed_everything(workers=True, seed=42)
     model_name = get_model_names_from_numbers([model_number])[0]
 
     model_args["model_names_or_paths"] = [model_name]
     if soft_prompt_name:
+        print(f"Validating {soft_prompt_name} on model {model_number}")
         model_args["local_soft_prompt"] = f"logs/explainable-soft-prompts/{soft_prompt_name}/checkpoints/soft_prompt.pt"
     model = BasicLM(**model_args)
     if weight is not None:
+        print(f"Validating custom weight on model {model_number}")
         model.set_soft_prompt_weight(weight)
 
     if use_test_set:
@@ -212,25 +215,6 @@ def validate_soft_prompt(
     return trainer.validate(model, dm)[0]["val/loss"]
 
 
-<<<<<<< HEAD
-def get_k_nearest_neighbors(
-    distance_metric: str, soft_prompt_token: torch.Tensor, embeddings: torch.Tensor, k: int
-) -> List[int]:
-    if distance_metric == "cosine":
-        similarity = torch.nn.functional.cosine_similarity(soft_prompt_token, embeddings, dim=-1)
-        return torch.argsort(similarity, descending=True)[:k].tolist()
-    else:
-        distance = torch.linalg.vector_norm(embeddings - soft_prompt_token, dim=-1, ord=2)
-        return torch.argsort(distance, descending=False)[:k].tolist()
-
-
-def get_k_nearest_neighbors_for_all_tokens(
-    distance_metric: str, soft_prompt: torch.Tensor, embeddings: torch.Tensor, k: int
-) -> List[List[int]]:
-    if k == 1:
-        return [get_k_nearest_neighbors(distance_metric, soft_prompt[i], embeddings, k)[0] for i in range(soft_prompt.size(0))]
-    return [get_k_nearest_neighbors(distance_metric, soft_prompt[i], embeddings, k) for i in range(soft_prompt.size(0))]
-=======
 def validate_soft_prompt_on_multiple_models(
     model_numbers: list,
     config_path: str,
@@ -250,4 +234,3 @@ def validate_soft_prompt_on_multiple_models(
     for model_number in model_numbers:
         val_losses.append(validate_soft_prompt(model_args, trainer, dm, model_number, use_test_set, weight, soft_prompt_name))
     return val_losses
->>>>>>> 83a23f9 (Refcatoring of evaluation scripts)

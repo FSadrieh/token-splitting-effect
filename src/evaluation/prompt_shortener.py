@@ -47,7 +47,6 @@ def create_soft_prompt_weights(
     soft_prompt_weight = load_soft_prompt_weight(soft_prompt_name)
     if inverse:
         dropped_out_tokens = [i for i in range(prompt_length) if i not in dropped_out_tokens]
-    
 
     if shorten:
         print("Dropped out tokens:", dropped_out_tokens)

@@ -35,7 +35,7 @@ def main():
                         dropped_out_tokens=[],
                         inverse=False,
                         shorten=False,
-                        batch_size=1,
+                        batch_size=128,
                         use_test_set=True,
                         seed=seed,
                         number_of_tokens_to_drop=14,

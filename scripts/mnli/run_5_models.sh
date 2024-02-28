@@ -1,5 +1,4 @@
 #!/bin/bash
-# You only need to run one of the first models since they are all the same
 
 # These are the 5_models with different pre-trained MultiBerts
 python train.py --config cfgs/mnli/5_models/models/mnli_5_model_0.yml
