@@ -1,16 +1,34 @@
-# An opinionated template for NLP research code
+# Explainable Soft Prompts
+
+Repository for the work: "Explainable Soft Prompts".
+
+All results and artifacts can be found in <code>logs/explainable-soft-prompts</code>. In <code>cfgs</code> all used training configurations are stored.
+
+To reproduce the paper results use the scripts from the <code>scripts</code> folder or <code>run_emotion.sh</code>, <code>run_imdb.sh</code> and <code>run_mnli.sh</code>.
+
+The files are documented via inline-documentation.
+
+For detailed usage see the information on the NLP research template, this works builds upon.
+
+The recommended usage is:
+
+1. Cloning of the repository
+2. Run:
+```bash
+bash ./scripts/run-in-docker.sh -g <wanted-gpus> bash
+```
+3. Run which ever result you want to reproduce using <code>scripts</code> folder.
+
+
+<details><summary>NLP research template</summary>
+
+# NLP research template
+
 
 [![Docker Hub](https://img.shields.io/docker/v/konstantinjdobler/nlp-research-template/latest?color=blue&label=docker&logo=docker)](https://hub.docker.com/r/konstantinjdobler/nlp-research-template/tags)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 ![Linter](https://img.shields.io/badge/linter-ruff-blue)
 ![License: MIT](https://img.shields.io/github/license/konstantinjdobler/nlp-research-template?color=green)
-
-## Explainable Soft Prompts
-
-```bash
-# Example 
-python train.py --data_dir data/imdb --micro_batch_size 16 --hf_model_name google/multiberts-seed_3 --offline --preprocessing_workers 1
-```
 
 
 NLP research template for training language models using PyTorch + Lightning + Weights & Biases + HuggingFace. It's built to be customized but provides comprehensive, sensible default functionality.
@@ -236,3 +254,5 @@ Sometimes it's just quicker or unavoidable to create an environment via `conda-l
 ### Code style
 
 We use the `ruff` linter and `black` formatter. You should install their VS Code extensions and enable "Format on Save" inside VS Code.
+
+</details>
