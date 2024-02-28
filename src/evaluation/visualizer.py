@@ -19,8 +19,8 @@ from utils import create_init_text, get_model_names_from_numbers, load_init_text
 
 
 DEFAULT_COLORS = ["gray", "red", "blue", "orange", "green", "purple", "brown", "pink", "olive", "cyan", "black"]
-DEFAULT_COLORS_LIGHT = ["#A6CEE4", "#B1DF8A", "#FB9B98", "#FEC06E", "#C9B2D6", "#FFFF99"]
-DEFAULT_COLORS_STRONG = ["#2077B3", "#32A02E", "#E21A1C", "#FF7F00", "#6B3D9A", "#B15A29"]
+DEFAULT_COLORS_LIGHT = ["#A6CEE4", "#B1DF8A", "#FB9B98", "#FEC06E", "#C9B2D6", "#FFFF99", "green", "purple", "brown", "pink", "olive", "cyan", "black"]
+DEFAULT_COLORS_STRONG = ["#2077B3", "#32A02E", "#E21A1C", "#FF7F00", "#6B3D9A", "#B15A29", "green", "purple", "brown", "pink", "olive", "cyan", "black"]
 
 
 def arg_parser():
