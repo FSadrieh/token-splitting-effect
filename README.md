@@ -4,11 +4,9 @@ Repository for the work: "Explainable Soft Prompts".
 
 All results and artifacts can be found in <code>logs/explainable-soft-prompts</code>. In <code>cfgs</code> all used training configurations are stored.
 
-To reproduce the paper results use the scripts from the <code>scripts</code> folder or <code>run_emotion.sh</code>, <code>run_imdb.sh</code> and <code>run_mnli.sh</code>.
+To reproduce the paper results, use the scripts from the <code>scripts</code> folder or <code>run_emotion.sh</code>, <code>run_imdb.sh</code> and <code>run_mnli.sh</code>.
 
-The files are documented via inline-documentation.
-
-For detailed usage see the information on the NLP research template, this works builds upon.
+For detailed usage, see the information on the NLP research template, this works builds upon.
 
 The recommended usage is:
 
