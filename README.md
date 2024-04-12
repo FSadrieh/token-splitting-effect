@@ -1,6 +1,14 @@
+![header](imgs/header.jpg)
+
 # Explainable Soft Prompts
 
-Repository for the work: "Explainable Soft Prompts".
+This repository provides the paper and code of **[Explainable Soft Prompts](explainable_soft_prompts.pdf)**, a study that explores prompt tuning across multiple Large Language Models (LLMs) for improved interpretability and transferability.
+
+## Introduction
+
+Prompt tuning in natural language processing allows leveraging Large Language Models (LLMs) efficiently. Yet soft prompts struggle with transferability between models and interpretability. This study introduces a method of tuning soft prompts across multiple models to uncover the **"token splitting effect"**. Prompt tokens align with specific models, lying in their embedding spaces and playing a crucial role in their performance. We show how this is hindering transferability, but allowing prompt compression after training. Our research highlights the soft prompt functionality across multiple models and sets a foundation for optimizing soft prompts through strategic compression and a deeper understanding of token importance.
+
+## Reproducibility
 
 All results and artifacts can be found in <code>logs/explainable-soft-prompts</code>. In <code>cfgs</code> all used training configurations are stored.
 
@@ -10,24 +18,47 @@ For detailed usage, see the information on the NLP research template, this works
 
 The recommended usage is:
 
-1. Cloning of the repository
+1. Cloning of the repository with
+
+```bash
+git clone https://github.com/FSadrieh/explainable-soft-prompts.git
+cd explainable-soft-prompts
+```
+
 2. Run:
+
 ```bash
 bash ./scripts/run-in-docker.sh -g <wanted-gpus> bash
 ```
-3. Run the right script for which ever result you want to reproduce using <code>scripts</code> folder.
 
+3. Run the desired script to reproduce specific results using the <code>scripts</code> folder.
 
-<details><summary>NLP research template</summary>
+## Cite this work
+
+If you use the code in this repository, please cite:
+
+```
+@software{ExplainableSoftPrompts2024,
+  author = {Reimann, Raphael and Sadrieh, Frederic},
+  title  = {{Explainable Soft Prompts}},
+  url    = {https://github.com/FSadrieh/explainable-soft-prompts},
+  month  = {02},
+  year   = {2024}
+}
+```
+
+## Appendix
+
+The code in this repository is built based on a [NLP Research Template](https://github.com/konstantinjdobler/nlp-research-template).
+
+<details><summary>Template documentation</summary>
 
 # NLP research template
-
 
 [![Docker Hub](https://img.shields.io/docker/v/konstantinjdobler/nlp-research-template/latest?color=blue&label=docker&logo=docker)](https://hub.docker.com/r/konstantinjdobler/nlp-research-template/tags)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 ![Linter](https://img.shields.io/badge/linter-ruff-blue)
 ![License: MIT](https://img.shields.io/github/license/konstantinjdobler/nlp-research-template?color=green)
-
 
 NLP research template for training language models using PyTorch + Lightning + Weights & Biases + HuggingFace. It's built to be customized but provides comprehensive, sensible default functionality.
 

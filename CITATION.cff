@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+title: "Explainable Soft Prompts"
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - family-names: "Reimann"
+    given-names: "Raphael"
+  - family-names: "Sadrieh"
+    given-names: "Frederic"
+repository-code: "https://github.com/FSadrieh/explainable-soft-prompts"
+license: MIT
+date-released: 2024-02-28
