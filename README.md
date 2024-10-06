@@ -1,8 +1,8 @@
 ![header](imgs/header.jpg)
 
-# Explainable Soft Prompts
+# Token Splitting Effect
 
-This repository provides the paper and code of **[Explainable Soft Prompts](explainable_soft_prompts.pdf)**, a study that explores prompt tuning across multiple Large Language Models (LLMs) for improved interpretability and transferability.
+This repository provides the paper and code of **[Token Splitting Effect](token-splitting-effect.pdf)**, a study that explores prompt tuning across multiple Large Language Models (LLMs) for improved interpretability and transferability.
 
 ## Introduction
 
